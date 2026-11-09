@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.0.4"
+HL.version = "1.1.0"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -19,6 +19,7 @@ local defaults = {
     minimapButton = true,
     testMode = false,
     debug = false,
+    deathPopup = true,
 }
 
 local function InitDB()
@@ -64,14 +65,10 @@ function HL:GetInfo(name)
 
     local key = strlower(name)
 
-    -- 1) dokladne dopasowanie
     if HuntLista_Lookup[key] then
         return HuntLista_Lookup[key]
     end
 
-    -- 2) Forever: UnitName bywa zwraca tylko PIERWSZE slowo wieloczlonowej nazwy.
-    --    Match TYLKO gdy na liscie jest "Slowo Reszta" a unit to dokladnie "Slowo".
-    --    Min. 3 znaki, zeby krotkie fragmenty nie lapaly losowych ludzi.
     if #key >= 3 then
         for k, info in pairs(HuntLista_Lookup) do
             if #k > #key and k:sub(1, #key + 1) == key .. " " then
@@ -143,8 +140,8 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Wersja addona: " .. HL.version)
         print("  Wersja danych: " .. HL.dataVersion)
         print("  Graczy na liscie: " .. HL:GetPlayerCount())
+        print("  Death popup: " .. ((HuntListaDB.deathPopup ~= false) and "ON" or "OFF"))
         print("  Test mode: " .. (HuntListaDB.testMode and "|cffff0000ON|r" or "OFF"))
-        print("  Debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     elseif msg == "reload" or msg == "odswiez" then
         RebuildLookup()
         print("|cff00ff00Hunt Lista|r - dane odswiezone. Graczy: " .. HL:GetPlayerCount())
@@ -154,41 +151,45 @@ SlashCmdList["HUNTLISTA"] = function(msg)
     elseif msg == "test off" then
         HuntListaDB.testMode = false
         print("|cff00ff00Hunt Lista|r TEST MODE: OFF")
+    elseif msg == "death" or msg == "death on" then
+        HuntListaDB.deathPopup = true
+        print("|cff00ff00Hunt Lista|r death popup: ON")
+    elseif msg == "death off" then
+        HuntListaDB.deathPopup = false
+        print("|cff00ff00Hunt Lista|r death popup: OFF")
+    elseif msg:match("^killer") then
+        -- /hl killer  albo  /hl killer TestNick
+        local name = msg:match("^killer%s+(.+)$")
+        if name then
+            HL:ShowKillerPopup(name)
+        elseif UnitExists("target") and UnitName("target") then
+            HL:ShowKillerPopup(UnitName("target"))
+        else
+            print("|cff00ff00Hunt Lista|r uzyj: /hl killer Nick  albo target + /hl killer")
+        end
     elseif msg == "check" then
         print("|cff00ff00Hunt Lista|r DEBUG check:")
-        print("  testMode = " .. tostring(HuntListaDB.testMode))
-        print("  graczy w lookup = " .. HL:GetPlayerCount())
         local units = {"target", "mouseover"}
         for _, unit in ipairs(units) do
             if UnitExists(unit) then
                 local n = UnitName(unit)
-                local full = (UnitFullName and UnitFullName(unit)) or n
-                local isPlayer = UnitIsPlayer(unit) and "yes" or "no"
-                local isEnemy = UnitIsEnemy("player", unit) and "yes" or "no"
                 local info = HL:GetInfo(n)
-                print("  [" .. unit .. "] name=" .. tostring(n) .. " full=" .. tostring(full))
-                print("    player=" .. isPlayer .. " enemy=" .. isEnemy .. " onList=" .. (info and ("YES -> " .. info.name) or "NO"))
-                if info then
-                    HL:CheckUnit(unit)
-                end
+                print("  [" .. unit .. "] name=" .. tostring(n) .. " onList=" .. (info and ("YES -> " .. info.name) or "NO"))
             else
                 print("  [" .. unit .. "] brak")
             end
-        end
-        print("  Lista w pamieci:")
-        for k, info in pairs(HuntLista_Lookup) do
-            print("    - [" .. k .. "] => " .. info.name)
         end
     elseif msg == "debug" then
         HuntListaDB.debug = not HuntListaDB.debug
         print("|cff00ff00Hunt Lista|r debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     else
         print("|cff00ff00Hunt Lista|r komendy:")
-        print("  /hl          - lista")
+        print("  /hl              - lista")
         print("  /hl status")
         print("  /hl test / test off")
-        print("  /hl check    - DEBUG target/mouseover")
-        print("  /hl debug    - logi przy najechaniu")
+        print("  /hl death / death off - okienko po smierci")
+        print("  /hl killer [nick] - test okienka zabojcy")
+        print("  /hl check")
     end
 end
 
