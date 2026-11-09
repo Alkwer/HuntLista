@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.12",
-    lastUpdate = "2026-11-09 21:01",
+    version = "2026-11-09.13",
+    lastUpdate = "2026-11-09 21:02",
     updatedBy = "DiscordBot",
 
     players = {
@@ -54,6 +54,12 @@ HuntLista_Data = {
         ["Spin Hero"] = {
             reason = "jego nie bijemy owo",
             addedBy = "riolumt",
+            addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Two Bob"] = {
+            reason = "do wypatroszenia szmaciarz",
+            addedBy = "wicherek",
             addedAt = "2026-11-09",
             note = "",
         },
