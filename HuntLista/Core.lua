@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.1.0"
+HL.version = "1.1.1"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -46,6 +46,10 @@ local function RebuildLookup()
             addedAt = info.addedAt or "",
             note = info.note or "",
         }
+        -- uzupelnij cache pelnych nazw
+        if HL.CacheFullName then
+            HL:CacheFullName(name)
+        end
     end
 end
 
@@ -107,23 +111,23 @@ frame:SetScript("OnEvent", function(self, event, ...)
             RebuildLookup()
             print("|cff00ff00Hunt Lista|r zaladowane. Wersja: |cffffff00" .. HL.version .. "|r  dane: " .. HL.dataVersion .. " (" .. HL:GetPlayerCount() .. " graczy)")
             print("Komenda: |cffffff00/hl|r")
-            if HuntListaDB.testMode then
-                print("|cffff0000TEST MODE ON|r - /hl test off aby wylaczyc")
-            end
         end
     elseif event == "PLAYER_LOGIN" then
         RebuildLookup()
     elseif event == "PLAYER_TARGET_CHANGED" then
+        if HL.CacheUnit then HL:CacheUnit("target") end
         if HuntListaDB.alertOnTarget then
             HL:CheckUnit("target")
         end
     elseif event == "UPDATE_MOUSEOVER_UNIT" then
+        if HL.CacheUnit then HL:CacheUnit("mouseover") end
         if HuntListaDB.alertOnMouseover then
             HL:CheckUnit("mouseover")
         end
     elseif event == "NAME_PLATE_UNIT_ADDED" then
+        local unit = ...
+        if HL.CacheUnit then HL:CacheUnit(unit) end
         if HuntListaDB.alertOnNameplate then
-            local unit = ...
             HL:CheckUnit(unit)
         end
     end
@@ -158,23 +162,24 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         HuntListaDB.deathPopup = false
         print("|cff00ff00Hunt Lista|r death popup: OFF")
     elseif msg:match("^killer") then
-        -- /hl killer  albo  /hl killer TestNick
         local name = msg:match("^killer%s+(.+)$")
         if name then
             HL:ShowKillerPopup(name)
         elseif UnitExists("target") and UnitName("target") then
+            if HL.CacheUnit then HL:CacheUnit("target") end
             HL:ShowKillerPopup(UnitName("target"))
         else
             print("|cff00ff00Hunt Lista|r uzyj: /hl killer Nick  albo target + /hl killer")
         end
     elseif msg == "check" then
-        print("|cff00ff00Hunt Lista|r DEBUG check:")
         local units = {"target", "mouseover"}
         for _, unit in ipairs(units) do
             if UnitExists(unit) then
+                if HL.CacheUnit then HL:CacheUnit(unit) end
                 local n = UnitName(unit)
+                local full = HL.ResolveFullName and HL:ResolveFullName(n) or n
                 local info = HL:GetInfo(n)
-                print("  [" .. unit .. "] name=" .. tostring(n) .. " onList=" .. (info and ("YES -> " .. info.name) or "NO"))
+                print("  [" .. unit .. "] unit=" .. tostring(n) .. " full=" .. tostring(full) .. " onList=" .. (info and "YES" or "NO"))
             else
                 print("  [" .. unit .. "] brak")
             end
@@ -184,12 +189,8 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("|cff00ff00Hunt Lista|r debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     else
         print("|cff00ff00Hunt Lista|r komendy:")
-        print("  /hl              - lista")
-        print("  /hl status")
-        print("  /hl test / test off")
-        print("  /hl death / death off - okienko po smierci")
-        print("  /hl killer [nick] - test okienka zabojcy")
-        print("  /hl check")
+        print("  /hl  /hl status  /hl test  /hl death")
+        print("  /hl killer [nick]  /hl check")
     end
 end
 
