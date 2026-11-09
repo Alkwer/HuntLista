@@ -4,7 +4,7 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.14",
+    version = "2026-11-09.15",
     lastUpdate = "2026-11-09 21:07",
     updatedBy = "DiscordBot",
 
@@ -30,6 +30,12 @@ HuntLista_Data = {
         ["Hacz Ling"] = {
             reason = "xd",
             addedBy = "frethborn",
+            addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Miss Smitey"] = {
+            reason = "",
+            addedBy = "emwues",
             addedAt = "2026-11-09",
             note = "",
         },
