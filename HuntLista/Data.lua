@@ -4,17 +4,11 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.8",
+    version = "2026-11-09.9",
     lastUpdate = "2026-11-09 12:43",
     updatedBy = "DiscordBot",
 
     players = {
-        ["Mega Chäd"] = {
-            reason = "test",
-            addedBy = "frethborn",
-            addedAt = "2026-11-09",
-            note = "",
-        },
         ["Mr Morix"] = {
             reason = "cwel xd",
             addedBy = "frethborn",
