@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.6",
-    lastUpdate = "2026-11-09 16:27",
+    version = "2026-11-09.7",
+    lastUpdate = "2026-11-09 17:40",
     updatedBy = "DiscordBot",
 
     players = {
@@ -24,6 +24,12 @@ HuntLista_Data = {
         ["Pani Kot"] = {
             reason = "pionek",
             addedBy = "frethborn",
+            addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Zip Folder"] = {
+            reason = "",
+            addedBy = "grobel",
             addedAt = "2026-11-09",
             note = "",
         },
