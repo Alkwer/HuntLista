@@ -1,6 +1,6 @@
 # Hunt Lista
 
-Gildyjny addon do **WoW Forever** — lista graczy PvP do oznaczania ("hunt list").
+Gildyjny addon do **WoW Forever** — lista graczy PvP do oznaczania ("hunt list") zrobiony przez mojego przyjaciela groka
 
 Gdy ktoś z listy pojawi się w grze, dostajesz **alert**, **dźwięk** i **czerwoną czaszkę** przy nameplate / targetcie.
 
