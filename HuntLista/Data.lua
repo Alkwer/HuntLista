@@ -4,19 +4,13 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.7",
-    lastUpdate = "2026-11-09 11:51",
+    version = "2026-11-09.8",
+    lastUpdate = "2026-11-09 12:43",
     updatedBy = "DiscordBot",
 
     players = {
         ["Mega Chäd"] = {
             reason = "test",
-            addedBy = "frethborn",
-            addedAt = "2026-11-09",
-            note = "",
-        },
-        ["Mephi Live"] = {
-            reason = "",
             addedBy = "frethborn",
             addedAt = "2026-11-09",
             note = "",
