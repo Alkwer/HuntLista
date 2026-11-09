@@ -4,7 +4,7 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.16",
+    version = "2026-11-09.17",
     lastUpdate = "2026-11-09 21:08",
     updatedBy = "DiscordBot",
 
@@ -72,6 +72,12 @@ HuntLista_Data = {
         ["Two Bob"] = {
             reason = "do wypatroszenia szmaciarz",
             addedBy = "wicherek",
+            addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Van Gachiboss"] = {
+            reason = "",
+            addedBy = "emwues",
             addedAt = "2026-11-09",
             note = "",
         },
