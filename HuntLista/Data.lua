@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.13",
-    lastUpdate = "2026-11-09 21:02",
+    version = "2026-11-09.14",
+    lastUpdate = "2026-11-09 21:07",
     updatedBy = "DiscordBot",
 
     players = {
@@ -60,6 +60,12 @@ HuntLista_Data = {
         ["Two Bob"] = {
             reason = "do wypatroszenia szmaciarz",
             addedBy = "wicherek",
+            addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Vladskii Forever"] = {
+            reason = "",
+            addedBy = "emwues",
             addedAt = "2026-11-09",
             note = "",
         },
