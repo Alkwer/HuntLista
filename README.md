@@ -2,7 +2,7 @@
 
 Gildyjny addon do **WoW Forever** — lista graczy PvP do oznaczania ("hunt list") zrobiony przez mojego przyjaciela groka
 
-Gdy ktoś z listy pojawi się w grze, dostajesz **alert**, **dźwięk** i **czerwoną czaszkę** przy nameplate / targetcie.
+Gdy ktoś z listy pojawi się w grze, dostajesz **alert**, **dźwięk** i **czerwoną czaszkę** przy nameplate / targecie.
 
 Lista jest wspólna dla gildii: dodajecie ludzi przez **bota na Discordzie**, a addon ściąga aktualne dane z tego repo.
 
