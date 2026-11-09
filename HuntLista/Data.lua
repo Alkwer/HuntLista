@@ -4,11 +4,17 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.8",
-    lastUpdate = "2026-11-09 18:43",
+    version = "2026-11-09.9",
+    lastUpdate = "2026-11-09 20:02",
     updatedBy = "DiscordBot",
 
     players = {
+        ["Gapped Teeth"] = {
+            reason = "zjeb",
+            addedBy = "frethborn",
+            addedAt = "2026-11-09",
+            note = "",
+        },
         ["Hacz Ling"] = {
             reason = "xd",
             addedBy = "frethborn",
