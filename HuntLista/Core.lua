@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.1.1"
+HL.version = "1.1.2"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -46,7 +46,6 @@ local function RebuildLookup()
             addedAt = info.addedAt or "",
             note = info.note or "",
         }
-        -- uzupelnij cache pelnych nazw
         if HL.CacheFullName then
             HL:CacheFullName(name)
         end
@@ -137,6 +136,13 @@ SLASH_HUNTLISTA1 = "/hl"
 SLASH_HUNTLISTA2 = "/huntlista"
 SlashCmdList["HUNTLISTA"] = function(msg)
     msg = strtrim(strlower(msg or ""))
+
+    -- jak EditBox trzyma focus, komendy i tak powinny dzialac z chatu
+    if HL.HideKillerPopup and msg == "close" then
+        HL:HideKillerPopup()
+        return
+    end
+
     if msg == "" or msg == "show" or msg == "lista" then
         HL:ToggleList()
     elseif msg == "status" then
@@ -161,15 +167,21 @@ SlashCmdList["HUNTLISTA"] = function(msg)
     elseif msg == "death off" then
         HuntListaDB.deathPopup = false
         print("|cff00ff00Hunt Lista|r death popup: OFF")
-    elseif msg:match("^killer") then
+    elseif msg == "killer" or msg:match("^killer%s+") then
+        if not HL.ShowKillerPopup then
+            print("|cffff0000Hunt Lista|r brak Death.lua - pobierz ponownie addon")
+            return
+        end
         local name = msg:match("^killer%s+(.+)$")
-        if name then
+        if name and name ~= "" then
             HL:ShowKillerPopup(name)
         elseif UnitExists("target") and UnitName("target") then
             if HL.CacheUnit then HL:CacheUnit("target") end
             HL:ShowKillerPopup(UnitName("target"))
         else
-            print("|cff00ff00Hunt Lista|r uzyj: /hl killer Nick  albo target + /hl killer")
+            -- testowy popup z przykladowym nickiem
+            HL:ShowKillerPopup("Test Nick")
+            print("|cff00ff00Hunt Lista|r brak targetu - pokazano testowy nick")
         end
     elseif msg == "check" then
         local units = {"target", "mouseover"}
@@ -190,7 +202,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
     else
         print("|cff00ff00Hunt Lista|r komendy:")
         print("  /hl  /hl status  /hl test  /hl death")
-        print("  /hl killer [nick]  /hl check")
+        print("  /hl killer [nick]  /hl check  /hl close")
     end
 end
 

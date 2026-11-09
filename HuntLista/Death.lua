@@ -12,43 +12,33 @@ local deathFrame
 
 HL.NameCache = HL.NameCache or {}
 
--- Czyści nick: kolory, realm, gildia <...>, tylko pierwsza linia
 local function CleanPlayerName(name)
     if not name or name == "" then return nil end
+    name = tostring(name)
     name = strtrim(name)
 
-    -- kody kolorow / tekstury
     name = name:gsub("|c%x%x%x%x%x%x%x%x", "")
     name = name:gsub("|r", "")
     name = name:gsub("|T.-|t", "")
     name = name:gsub("|A.-|a", "")
 
-    -- tylko pierwsza linia (druga bywa gildia)
     name = name:match("([^
 ]+)") or name
     name = strtrim(name)
 
-    -- wyrzuc calkowicie tagi gildii: <Something>
     if name:match("^<.*>$") then
         return nil
     end
     name = name:gsub("%s*<.->%s*", " ")
     name = name:gsub("%s*%b<>%s*", " ")
 
-    -- realm Name-Realm
-    local base = name:match("^(.-)%-[^%-]+$")
-    if base and base ~= "" and not base:find(" ") then
-        -- ostroznie: nicki ze spacja + myslnik rzadkie; klasyczny realm bez spacji w base
-        -- lepiej: odetnij tylko gdy po myslniku wyglada jak realm (bez spacji)
-        local before, after = name:match("^(.-)%-([^%-]+)$")
-        if before and after and not after:find(" ") then
-            name = before
-        end
+    local before, after = name:match("^(.-)%-([^%-]+)$")
+    if before and after and not after:find(" ") and not before:find("<") then
+        name = before
     end
 
     name = strtrim(name)
     name = name:gsub("%s+", " ")
-
     if name == "" then return nil end
     return name
 end
@@ -61,14 +51,12 @@ end
 function HL:CacheFullName(full)
     full = CleanPlayerName(full)
     if not full then return end
-    -- nie cache'uj samego tagu / smieci
     if full:find("<") or full:find(">") then return end
 
     local fw = FirstWord(full)
     if not fw or #fw < 2 then return end
 
     local prev = HL.NameCache[fw]
-    -- preferuj nazwe ze spacja (pelny nick Forever), ale nie dluzszy smiec
     if not prev then
         HL.NameCache[fw] = full
     elseif #full > #prev and full:find(" ") then
@@ -113,7 +101,6 @@ function HL:CacheUnit(unit)
         local plate = C_NamePlate.GetNamePlateForUnit(unit)
         if plate and plate.UnitFrame then
             local uf = plate.UnitFrame
-            -- tylko pole name / Name - NIE wszystkie regiony (tam jest gildia)
             if uf.name and uf.name.GetText then
                 local t = uf.name:GetText()
                 if t and not t:match("^<") then
@@ -168,6 +155,8 @@ local function CreateDeathFrame()
     eb:SetJustifyH("CENTER")
     eb:SetTextInsets(8, 8, 0, 0)
     eb:SetMaxLetters(64)
+    eb:EnableMouse(true)
+    eb:EnableKeyboard(false)
 
     local bg = eb:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
@@ -175,14 +164,24 @@ local function CreateDeathFrame()
 
     eb:SetScript("OnEscapePressed", function(self)
         self:ClearFocus()
+        self:EnableKeyboard(false)
         f:Hide()
     end)
     eb:SetScript("OnMouseDown", function(self)
+        self:EnableKeyboard(true)
         self:SetFocus()
         self:HighlightText()
     end)
     eb:SetScript("OnEditFocusGained", function(self)
+        self:EnableKeyboard(true)
         self:HighlightText()
+    end)
+    eb:SetScript("OnEditFocusLost", function(self)
+        self:EnableKeyboard(false)
+    end)
+    eb:SetScript("OnEnterPressed", function(self)
+        self:ClearFocus()
+        self:EnableKeyboard(false)
     end)
     f.editBox = eb
 
@@ -211,6 +210,7 @@ local function CreateDeathFrame()
     local selectBtn = MakeBtn(110, "Zaznacz")
     selectBtn:SetPoint("BOTTOMLEFT", 28, 14)
     selectBtn:SetScript("OnClick", function()
+        eb:EnableKeyboard(true)
         eb:SetFocus()
         eb:HighlightText()
     end)
@@ -219,7 +219,13 @@ local function CreateDeathFrame()
     close:SetPoint("BOTTOMRIGHT", -28, 14)
     close:SetScript("OnClick", function()
         eb:ClearFocus()
+        eb:EnableKeyboard(false)
         f:Hide()
+    end)
+
+    f:SetScript("OnHide", function()
+        eb:ClearFocus()
+        eb:EnableKeyboard(false)
     end)
 
     deathFrame = f
@@ -227,14 +233,25 @@ local function CreateDeathFrame()
 end
 
 function HL:ShowKillerPopup(name)
-    if HuntListaDB and HuntListaDB.deathPopup == false then return end
-    if not name or name == "" then return end
+    if HuntListaDB and HuntListaDB.deathPopup == false then
+        print("|cff00ff00Hunt Lista|r death popup jest OFF (/hl death)")
+        return
+    end
+    if not name or name == "" then
+        print("|cff00ff00Hunt Lista|r brak nicku zabojcy")
+        return
+    end
 
     name = HL:ResolveFullName(name)
     name = CleanPlayerName(name)
-    if not name then return end
+    if not name then
+        print("|cff00ff00Hunt Lista|r nie udalo sie odczytac nicku")
+        return
+    end
 
     local f = CreateDeathFrame()
+    f.editBox:EnableKeyboard(false)
+    f.editBox:ClearFocus()
     f.editBox:SetText(name)
 
     local info = HL.GetInfo and HL:GetInfo(name) or nil
@@ -250,7 +267,10 @@ end
 
 function HL:HideKillerPopup()
     if deathFrame then
-        if deathFrame.editBox then deathFrame.editBox:ClearFocus() end
+        if deathFrame.editBox then
+            deathFrame.editBox:ClearFocus()
+            deathFrame.editBox:EnableKeyboard(false)
+        end
         deathFrame:Hide()
     end
 end
@@ -263,7 +283,7 @@ cacheFrame:RegisterEvent("PLAYER_LOGIN")
 cacheFrame:SetScript("OnEvent", function(_, event, unit)
     if event == "PLAYER_LOGIN" then
         playerGUID = UnitGUID("player")
-        wipe(HL.NameCache)
+        if HL.NameCache then wipe(HL.NameCache) end
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         HL:CacheUnit(unit)
     elseif event == "PLAYER_TARGET_CHANGED" then
