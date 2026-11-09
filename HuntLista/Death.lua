@@ -12,14 +12,43 @@ local deathFrame
 
 HL.NameCache = HL.NameCache or {}
 
-local function StripRealm(name)
+-- Czyści nick: kolory, realm, gildia <...>, tylko pierwsza linia
+local function CleanPlayerName(name)
     if not name or name == "" then return nil end
     name = strtrim(name)
-    name = name:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+
+    -- kody kolorow / tekstury
+    name = name:gsub("|c%x%x%x%x%x%x%x%x", "")
+    name = name:gsub("|r", "")
     name = name:gsub("|T.-|t", "")
-    local base = name:match("^(.-)%-[^%-]+$")
-    if base and base ~= "" then name = base end
+    name = name:gsub("|A.-|a", "")
+
+    -- tylko pierwsza linia (druga bywa gildia)
+    name = name:match("([^
+]+)") or name
     name = strtrim(name)
+
+    -- wyrzuc calkowicie tagi gildii: <Something>
+    if name:match("^<.*>$") then
+        return nil
+    end
+    name = name:gsub("%s*<.->%s*", " ")
+    name = name:gsub("%s*%b<>%s*", " ")
+
+    -- realm Name-Realm
+    local base = name:match("^(.-)%-[^%-]+$")
+    if base and base ~= "" and not base:find(" ") then
+        -- ostroznie: nicki ze spacja + myslnik rzadkie; klasyczny realm bez spacji w base
+        -- lepiej: odetnij tylko gdy po myslniku wyglada jak realm (bez spacji)
+        local before, after = name:match("^(.-)%-([^%-]+)$")
+        if before and after and not after:find(" ") then
+            name = before
+        end
+    end
+
+    name = strtrim(name)
+    name = name:gsub("%s+", " ")
+
     if name == "" then return nil end
     return name
 end
@@ -30,30 +59,46 @@ local function FirstWord(name)
 end
 
 function HL:CacheFullName(full)
-    full = StripRealm(full)
+    full = CleanPlayerName(full)
     if not full then return end
+    -- nie cache'uj samego tagu / smieci
+    if full:find("<") or full:find(">") then return end
+
     local fw = FirstWord(full)
-    if not fw then return end
+    if not fw or #fw < 2 then return end
+
     local prev = HL.NameCache[fw]
-    if not prev or #full > #prev then
+    -- preferuj nazwe ze spacja (pelny nick Forever), ale nie dluzszy smiec
+    if not prev then
+        HL.NameCache[fw] = full
+    elseif #full > #prev and full:find(" ") then
+        HL.NameCache[fw] = full
+    elseif #full > #prev and not prev:find(" ") then
         HL.NameCache[fw] = full
     end
 end
 
 function HL:ResolveFullName(name)
-    name = StripRealm(name)
+    name = CleanPlayerName(name)
     if not name then return nil end
+
     local fw = FirstWord(name)
     local cached = fw and HL.NameCache[fw]
-    if cached and #cached >= #name then
-        return cached
-    end
-    if HL.GetInfo then
-        local info = HL:GetInfo(name)
-        if info and info.name and #info.name >= #name then
-            return info.name
+    if cached then
+        cached = CleanPlayerName(cached)
+        if cached and #cached >= #name then
+            return cached
         end
     end
+
+    if HL.GetInfo then
+        local info = HL:GetInfo(name)
+        if info and info.name then
+            local n = CleanPlayerName(info.name)
+            if n and #n >= #name then return n end
+        end
+    end
+
     return name
 end
 
@@ -68,13 +113,18 @@ function HL:CacheUnit(unit)
         local plate = C_NamePlate.GetNamePlateForUnit(unit)
         if plate and plate.UnitFrame then
             local uf = plate.UnitFrame
+            -- tylko pole name / Name - NIE wszystkie regiony (tam jest gildia)
             if uf.name and uf.name.GetText then
                 local t = uf.name:GetText()
-                if t then HL:CacheFullName(t) end
+                if t and not t:match("^<") then
+                    HL:CacheFullName(t)
+                end
             end
             if uf.Name and uf.Name.GetText then
                 local t = uf.Name:GetText()
-                if t then HL:CacheFullName(t) end
+                if t and not t:match("^<") then
+                    HL:CacheFullName(t)
+                end
             end
         end
     end
@@ -110,7 +160,6 @@ local function CreateDeathFrame()
     sub:SetTextColor(0.7, 0.7, 0.7)
     sub:SetText("Kliknij w nick, Ctrl+C aby skopiowac")
 
-    -- EditBox do kopiowania (bez auto-focus przy smierci)
     local eb = CreateFrame("EditBox", nil, f)
     eb:SetSize(260, 32)
     eb:SetPoint("TOP", sub, "BOTTOM", 0, -12)
@@ -147,7 +196,6 @@ local function CreateDeathFrame()
         local t = b:CreateTexture(nil, "BACKGROUND")
         t:SetAllPoints()
         t:SetColorTexture(0.2, 0.05, 0.05, 0.95)
-        b.bg = t
         local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         fs:SetPoint("CENTER")
         fs:SetText(label)
@@ -183,11 +231,10 @@ function HL:ShowKillerPopup(name)
     if not name or name == "" then return end
 
     name = HL:ResolveFullName(name)
+    name = CleanPlayerName(name)
     if not name then return end
 
     local f = CreateDeathFrame()
-
-    -- NIE robimy SetFocus automatycznie (taint) - user klika w pole / Zaznacz
     f.editBox:SetText(name)
 
     local info = HL.GetInfo and HL:GetInfo(name) or nil
@@ -198,7 +245,6 @@ function HL:ShowKillerPopup(name)
     end
 
     print("|cffff4444[Hunt Lista]|r Zabojca: |cffffff00" .. name .. "|r")
-
     f:Show()
 end
 
@@ -217,6 +263,7 @@ cacheFrame:RegisterEvent("PLAYER_LOGIN")
 cacheFrame:SetScript("OnEvent", function(_, event, unit)
     if event == "PLAYER_LOGIN" then
         playerGUID = UnitGUID("player")
+        wipe(HL.NameCache)
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         HL:CacheUnit(unit)
     elseif event == "PLAYER_TARGET_CHANGED" then
