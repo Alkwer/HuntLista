@@ -4,22 +4,18 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.1",          -- data + numer wersji danych
-    lastUpdate = "2026-11-09 10:40",    -- kiedy bot ostatnio zaktualizował
+    version = "2026-11-09.2",
+    lastUpdate = "2026-11-09 10:36",
     updatedBy = "DiscordBot",
 
-    -- Lista graczy: klucz = nick (bez spacji, case-insensitive w kodzie)
-    -- value = tabela z info
     players = {
-        -- Przykład:
-        -- ["NickGracza"] = {
-        --     reason = "Gankał lowi / campował",
-        --     addedBy = "Stary",
-        --     addedAt = "2026-11-08",
-        --     note = "Czerwony mount, często w STV",
-        -- },
+        ["Mr Morix"] = {
+            reason = "",
+            addedBy = "frethborn",
+            addedAt = "2026-11-09",
+            note = "",
+        },
     }
 }
 
--- Szybki lookup (tworzony przy starcie)
 HuntLista_Lookup = {}
