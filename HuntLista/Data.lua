@@ -4,11 +4,17 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.10",
-    lastUpdate = "2026-11-09 20:06",
+    version = "2026-11-09.11",
+    lastUpdate = "2026-11-09 20:08",
     updatedBy = "DiscordBot",
 
     players = {
+        ["Atemix Shadow"] = {
+            reason = "",
+            addedBy = "haczkes",
+            addedAt = "2026-11-09",
+            note = "",
+        },
         ["Dziuto Moger"] = {
             reason = "",
             addedBy = "haczkes",
