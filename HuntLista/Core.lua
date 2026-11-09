@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.0.1-test"
+HL.version = "1.0.2-debug"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -18,6 +18,7 @@ local defaults = {
     showIcon = true,
     minimapButton = true,
     testMode = false,
+    debug = false,
 }
 
 local function InitDB()
@@ -36,7 +37,7 @@ local function RebuildLookup()
     if not HuntLista_Data or not HuntLista_Data.players then return end
 
     for name, info in pairs(HuntLista_Data.players) do
-        local key = strlower(name)
+        local key = strlower(strtrim(name))
         HuntLista_Lookup[key] = {
             name = name,
             reason = info.reason or "",
@@ -47,12 +48,24 @@ local function RebuildLookup()
     end
 end
 
+function HL:NormalizeName(name)
+    if not name or name == "" then return nil end
+    name = strtrim(name)
+    local base = name:match("^(.-)%-.+$")
+    if base and base ~= "" then
+        name = base
+    end
+    return name
+end
+
 function HL:IsOnList(name)
-    if not name or name == "" then return false end
+    name = HL:NormalizeName(name)
+    if not name then return false end
     return HuntLista_Lookup[strlower(name)] ~= nil
 end
 
 function HL:GetInfo(name)
+    name = HL:NormalizeName(name)
     if not name then return nil end
     return HuntLista_Lookup[strlower(name)]
 end
@@ -78,10 +91,10 @@ frame:SetScript("OnEvent", function(self, event, ...)
         if loaded == addonName then
             InitDB()
             RebuildLookup()
-            print("|cff00ff00Hunt Lista|r zaladowane. Wersja danych: |cffffff00" .. HL.dataVersion .. "|r  (" .. HL:GetPlayerCount() .. " graczy)")
-            print("Komenda: |cffffff00/hl|r  lub  |cffffff00/huntlista|r")
+            print("|cff00ff00Hunt Lista|r zaladowane. Wersja: |cffffff00" .. HL.version .. "|r  dane: " .. HL.dataVersion .. " (" .. HL:GetPlayerCount() .. " graczy)")
+            print("Komenda: |cffffff00/hl|r")
             if HuntListaDB.testMode then
-                print("|cffff0000TEST MODE ON|r - alertuje tez sojusznikow. /hl test off aby wylaczyc")
+                print("|cffff0000TEST MODE ON|r - /hl test off aby wylaczyc")
             end
         end
     elseif event == "PLAYER_LOGIN" then
@@ -113,24 +126,52 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Wersja addona: " .. HL.version)
         print("  Wersja danych: " .. HL.dataVersion)
         print("  Graczy na liscie: " .. HL:GetPlayerCount())
-        print("  Ostatnia aktualizacja: " .. (HuntLista_Data and HuntLista_Data.lastUpdate or "?"))
         print("  Test mode: " .. (HuntListaDB.testMode and "|cffff0000ON|r" or "OFF"))
+        print("  Debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     elseif msg == "reload" or msg == "odswiez" then
         RebuildLookup()
         print("|cff00ff00Hunt Lista|r - dane odswiezone. Graczy: " .. HL:GetPlayerCount())
     elseif msg == "test" or msg == "test on" then
         HuntListaDB.testMode = true
-        print("|cff00ff00Hunt Lista|r TEST MODE: ON - alertuje tez sojusznikow")
+        print("|cff00ff00Hunt Lista|r TEST MODE: ON")
     elseif msg == "test off" then
         HuntListaDB.testMode = false
-        print("|cff00ff00Hunt Lista|r TEST MODE: OFF - tylko wrogowie")
+        print("|cff00ff00Hunt Lista|r TEST MODE: OFF")
+    elseif msg == "check" then
+        print("|cff00ff00Hunt Lista|r DEBUG check:")
+        print("  testMode = " .. tostring(HuntListaDB.testMode))
+        print("  graczy w lookup = " .. HL:GetPlayerCount())
+        local units = {"target", "mouseover"}
+        for _, unit in ipairs(units) do
+            if UnitExists(unit) then
+                local n = UnitName(unit)
+                local full = (UnitFullName and UnitFullName(unit)) or n
+                local isPlayer = UnitIsPlayer(unit) and "yes" or "no"
+                local isEnemy = UnitIsEnemy("player", unit) and "yes" or "no"
+                local info = HL:GetInfo(n)
+                print("  [" .. unit .. "] name=" .. tostring(n) .. " full=" .. tostring(full))
+                print("    player=" .. isPlayer .. " enemy=" .. isEnemy .. " onList=" .. (info and "YES" or "NO"))
+                if info then
+                    HL:CheckUnit(unit)
+                end
+            else
+                print("  [" .. unit .. "] brak")
+            end
+        end
+        print("  Lista w pamieci:")
+        for k, info in pairs(HuntLista_Lookup) do
+            print("    - [" .. k .. "] => " .. info.name)
+        end
+    elseif msg == "debug" then
+        HuntListaDB.debug = not HuntListaDB.debug
+        print("|cff00ff00Hunt Lista|r debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     else
         print("|cff00ff00Hunt Lista|r komendy:")
-        print("  /hl          - otworz liste")
-        print("  /hl status   - status danych")
-        print("  /hl reload   - przeladuj lookup")
-        print("  /hl test     - wlacz test (sojusznicy tez)")
-        print("  /hl test off - wylacz test (tylko wrogowie)")
+        print("  /hl          - lista")
+        print("  /hl status")
+        print("  /hl test / test off")
+        print("  /hl check    - DEBUG target/mouseover")
+        print("  /hl debug    - logi przy najechaniu")
     end
 end
 

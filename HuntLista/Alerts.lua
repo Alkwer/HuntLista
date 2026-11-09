@@ -20,17 +20,35 @@ end
 function HL:CheckUnit(unit)
     if not HuntListaDB.enabled then return end
     if not UnitExists(unit) then return end
-    if not UnitIsPlayer(unit) then return end
+    if not UnitIsPlayer(unit) then
+        if HuntListaDB.debug then
+            print("|cff888888[HL debug]|r " .. tostring(unit) .. " nie jest graczem")
+        end
+        return
+    end
 
-    -- Test mode: alertuj tez sojusznikow. Normalnie tylko wrogowie.
     if not HuntListaDB.testMode then
-        if not UnitIsEnemy("player", unit) then return end
+        if not UnitIsEnemy("player", unit) then
+            if HuntListaDB.debug then
+                print("|cff888888[HL debug]|r " .. tostring(UnitName(unit)) .. " nie jest wrogiem (wlacz /hl test)")
+            end
+            return
+        end
     end
 
     local name = UnitName(unit)
     if not name then return end
 
     local info = HL:GetInfo(name)
+    if not info and UnitFullName then
+        local full = UnitFullName(unit)
+        if full then info = HL:GetInfo(full) end
+    end
+
+    if HuntListaDB.debug then
+        print("|cff888888[HL debug]|r unit=" .. unit .. " name=" .. tostring(name) .. " onList=" .. (info and "YES" or "NO") .. " test=" .. tostring(HuntListaDB.testMode))
+    end
+
     if not info then return end
 
     if CanAlert(name) then
