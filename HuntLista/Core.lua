@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.0.3"
+HL.version = "1.0.4"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -69,15 +69,14 @@ function HL:GetInfo(name)
         return HuntLista_Lookup[key]
     end
 
-    -- 2) Forever czesto zwraca tylko pierwsze slowo ("Mega" zamiast "Mega Chad")
-    for k, info in pairs(HuntLista_Lookup) do
-        -- lista: "mega chad", unit: "mega"
-        if #k > #key and k:sub(1, #key + 1) == key .. " " then
-            return info
-        end
-        -- lista: "mega", unit: "mega chad"
-        if #key > #k and key:sub(1, #k + 1) == k .. " " then
-            return info
+    -- 2) Forever: UnitName bywa zwraca tylko PIERWSZE slowo wieloczlonowej nazwy.
+    --    Match TYLKO gdy na liscie jest "Slowo Reszta" a unit to dokladnie "Slowo".
+    --    Min. 3 znaki, zeby krotkie fragmenty nie lapaly losowych ludzi.
+    if #key >= 3 then
+        for k, info in pairs(HuntLista_Lookup) do
+            if #k > #key and k:sub(1, #key + 1) == key .. " " then
+                return info
+            end
         end
     end
 

@@ -46,7 +46,7 @@ function HL:CheckUnit(unit)
     end
 
     if HuntListaDB.debug then
-        print("|cff888888[HL debug]|r unit=" .. unit .. " name=" .. tostring(name) .. " onList=" .. (info and "YES" or "NO") .. " test=" .. tostring(HuntListaDB.testMode))
+        print("|cff888888[HL debug]|r unit=" .. unit .. " name=" .. tostring(name) .. " onList=" .. (info and ("YES:" .. info.name) or "NO") .. " test=" .. tostring(HuntListaDB.testMode))
     end
 
     if not info then return end
@@ -103,7 +103,27 @@ function HL:ShowHuntIcon(unit, info)
     end
 end
 
+local function EnsurePlateIcon(uf)
+    if not uf.HuntListaIcon then
+        uf.HuntListaIcon = uf:CreateTexture(nil, "OVERLAY")
+        uf.HuntListaIcon:SetSize(18, 18)
+        uf.HuntListaIcon:SetPoint("RIGHT", uf.healthBar or uf, "LEFT", -2, 0)
+        uf.HuntListaIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
+        uf.HuntListaIcon:SetVertexColor(1, 0.15, 0.15)
+    end
+    return uf.HuntListaIcon
+end
+
 local function OnNamePlateAdded(unit)
+    local plate = C_NamePlate.GetNamePlateForUnit(unit)
+    if not plate or not plate.UnitFrame then return end
+    local uf = plate.UnitFrame
+
+    -- ZAWSZE schowaj stara ikone (nameplate'y sa recyklowane)
+    if uf.HuntListaIcon then
+        uf.HuntListaIcon:Hide()
+    end
+
     if not HuntListaDB.showIcon then return end
     if not UnitIsPlayer(unit) then return end
     if not HuntListaDB.testMode then
@@ -113,18 +133,8 @@ local function OnNamePlateAdded(unit)
     local name = UnitName(unit)
     if not HL:IsOnList(name) then return end
 
-    local plate = C_NamePlate.GetNamePlateForUnit(unit)
-    if not plate or not plate.UnitFrame then return end
-
-    local uf = plate.UnitFrame
-    if not uf.HuntListaIcon then
-        uf.HuntListaIcon = uf:CreateTexture(nil, "OVERLAY")
-        uf.HuntListaIcon:SetSize(18, 18)
-        uf.HuntListaIcon:SetPoint("RIGHT", uf.healthBar or uf, "LEFT", -2, 0)
-        uf.HuntListaIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
-        uf.HuntListaIcon:SetVertexColor(1, 0.15, 0.15)
-    end
-    uf.HuntListaIcon:Show()
+    local icon = EnsurePlateIcon(uf)
+    icon:Show()
 end
 
 local npFrame = CreateFrame("Frame")
