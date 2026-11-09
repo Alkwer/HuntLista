@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.6",
-    lastUpdate = "2026-11-09 11:05",
+    version = "2026-11-09.7",
+    lastUpdate = "2026-11-09 11:51",
     updatedBy = "DiscordBot",
 
     players = {
@@ -23,6 +23,12 @@ HuntLista_Data = {
         },
         ["Mr Morix"] = {
             reason = "cwel xd",
+            addedBy = "frethborn",
+            addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Pani Kot"] = {
+            reason = "pionek",
             addedBy = "frethborn",
             addedAt = "2026-11-09",
             note = "",
