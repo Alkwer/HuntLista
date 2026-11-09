@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.0.2-debug"
+HL.version = "1.0.3"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -58,16 +58,34 @@ function HL:NormalizeName(name)
     return name
 end
 
-function HL:IsOnList(name)
-    name = HL:NormalizeName(name)
-    if not name then return false end
-    return HuntLista_Lookup[strlower(name)] ~= nil
-end
-
 function HL:GetInfo(name)
     name = HL:NormalizeName(name)
     if not name then return nil end
-    return HuntLista_Lookup[strlower(name)]
+
+    local key = strlower(name)
+
+    -- 1) dokladne dopasowanie
+    if HuntLista_Lookup[key] then
+        return HuntLista_Lookup[key]
+    end
+
+    -- 2) Forever czesto zwraca tylko pierwsze slowo ("Mega" zamiast "Mega Chad")
+    for k, info in pairs(HuntLista_Lookup) do
+        -- lista: "mega chad", unit: "mega"
+        if #k > #key and k:sub(1, #key + 1) == key .. " " then
+            return info
+        end
+        -- lista: "mega", unit: "mega chad"
+        if #key > #k and key:sub(1, #k + 1) == k .. " " then
+            return info
+        end
+    end
+
+    return nil
+end
+
+function HL:IsOnList(name)
+    return HL:GetInfo(name) ~= nil
 end
 
 function HL:GetPlayerCount()
@@ -150,7 +168,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
                 local isEnemy = UnitIsEnemy("player", unit) and "yes" or "no"
                 local info = HL:GetInfo(n)
                 print("  [" .. unit .. "] name=" .. tostring(n) .. " full=" .. tostring(full))
-                print("    player=" .. isPlayer .. " enemy=" .. isEnemy .. " onList=" .. (info and "YES" or "NO"))
+                print("    player=" .. isPlayer .. " enemy=" .. isEnemy .. " onList=" .. (info and ("YES -> " .. info.name) or "NO"))
                 if info then
                     HL:CheckUnit(unit)
                 end
