@@ -1,14 +1,15 @@
 # ============================================================
-# Hunt Lista - Updater v1.1
+# Hunt Lista - Updater v1.2
 # ============================================================
 
 $ErrorActionPreference = "Stop"
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
 
 $RepoOwner      = "frethborn"
 $RepoName       = "HuntLista"
 $DataPathInRepo = "HuntLista/Data.lua"
-$RawUrl         = "https://raw.githubusercontent.com/$RepoOwner/$RepoName/main/$DataPathInRepo"
+# cache-bust - GitHub raw czasem trzyma stary plik kilka minut
+$RawUrl         = "https://raw.githubusercontent.com/$RepoOwner/$RepoName/main/$DataPathInRepo?t=$(Get-Date -UFormat %s)"
 $ConfigFile     = Join-Path $PSScriptRoot "updater-config.txt"
 
 function Pause-Exit($code = 0) {
@@ -21,23 +22,70 @@ function Write-Title {
     Clear-Host
     Write-Host ""
     Write-Host "  ======================================" -ForegroundColor Red
-    Write-Host "       HUNT LISTA  -  UPDATER" -ForegroundColor Red
+    Write-Host "       HUNT LISTA  -  UPDATER v1.2" -ForegroundColor Red
     Write-Host "  ======================================" -ForegroundColor Red
     Write-Host ""
+}
+
+function Download-Text($url) {
+    # 1) Invoke-WebRequest
+    try {
+        $resp = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30
+        if ($resp.Content) { return [string]$resp.Content }
+    } catch {
+        Write-Host "  Invoke-WebRequest fail: $($_.Exception.Message)" -ForegroundColor DarkYellow
+    }
+
+    # 2) WebClient
+    try {
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("User-Agent", "HuntLista-Updater/1.2")
+        $txt = $wc.DownloadString($url)
+        if ($txt) { return [string]$txt }
+    } catch {
+        Write-Host "  WebClient fail: $($_.Exception.Message)" -ForegroundColor DarkYellow
+    }
+
+    # 3) curl.exe (Windows 10+)
+    try {
+        $tmp = Join-Path $env:TEMP "huntlista-data.lua"
+        $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+        if ($curl) {
+            & curl.exe -fsSL $url -o $tmp
+            if (Test-Path $tmp) {
+                $txt = [System.IO.File]::ReadAllText($tmp)
+                Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+                if ($txt) { return $txt }
+            }
+        }
+    } catch {
+        Write-Host "  curl fail: $($_.Exception.Message)" -ForegroundColor DarkYellow
+    }
+
+    throw "Nie udalo sie pobrac pliku zadna metoda"
 }
 
 Write-Title
 
 # --- Szukanie folderu addona ---
 $addonDir = $null
+$forceAsk = $false
 
-if (Test-Path $ConfigFile) {
+if ($args -contains "-reset") {
+    if (Test-Path $ConfigFile) { Remove-Item $ConfigFile -Force }
+    Write-Host "  Zresetowano zapisana sciezke." -ForegroundColor Yellow
+    $forceAsk = $true
+}
+
+if (-not $forceAsk -and (Test-Path $ConfigFile)) {
     $saved = (Get-Content $ConfigFile -Raw -ErrorAction SilentlyContinue)
     if ($saved) {
-        $saved = $saved.Trim()
+        $saved = $saved.Trim().Trim([char]0xFEFF)
         if ($saved -and (Test-Path $saved)) {
             $addonDir = $saved
             Write-Host "  Znaleziono zapisana sciezke." -ForegroundColor DarkGray
+        } else {
+            Write-Host "  Zapisana sciezka jest nieaktualna - podaj nowa." -ForegroundColor Yellow
         }
     }
 }
@@ -81,7 +129,6 @@ if (-not $addonDir) {
     $addonDir = $inputPath
 }
 
-# Zapisz sciezke
 try {
     $addonDir | Set-Content -Path $ConfigFile -Encoding UTF8 -Force
 } catch {}
@@ -91,15 +138,15 @@ $targetFile = Join-Path $addonDir "Data.lua"
 Write-Host ""
 Write-Host "  Folder addona : $addonDir" -ForegroundColor Cyan
 Write-Host "  Plik docelowy : $targetFile" -ForegroundColor DarkGray
-Write-Host "  Zrodlo        : $RawUrl" -ForegroundColor DarkGray
+Write-Host "  Zrodlo        : https://raw.githubusercontent.com/$RepoOwner/$RepoName/main/$DataPathInRepo" -ForegroundColor DarkGray
 Write-Host ""
 
-# Sprawdz czy folder istnieje
 if (-not (Test-Path $addonDir)) {
     Write-Host "  [BLAD] Folder addona nie istnieje:" -ForegroundColor Red
     Write-Host "  $addonDir" -ForegroundColor Red
     Write-Host ""
-    Write-Host "  Usun plik updater-config.txt i sprobuj ponownie." -ForegroundColor Yellow
+    Write-Host "  Usun plik updater-config.txt i sprobuj ponownie" -ForegroundColor Yellow
+    Write-Host "  albo odpal: Update-HuntLista.bat -reset" -ForegroundColor Yellow
     Pause-Exit 1
 }
 
@@ -107,57 +154,71 @@ if (-not (Test-Path $addonDir)) {
 if (Test-Path $targetFile) {
     try {
         Copy-Item $targetFile (Join-Path $addonDir "Data.lua.bak") -Force
-        Write-Host "  OK  Backup starego Data.lua (Data.lua.bak)" -ForegroundColor DarkGray
+        Write-Host "  OK  Backup: Data.lua.bak" -ForegroundColor DarkGray
     } catch {
-        Write-Host "  UWAGA: nie udalo sie zrobic backupu: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "  UWAGA backup: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
 
-# Pobieranie
 Write-Host "  Pobieram najnowsza liste z GitHuba..." -ForegroundColor Yellow
 
 try {
-    $response = Invoke-WebRequest -Uri $RawUrl -UseBasicParsing -TimeoutSec 25
-    $content  = $response.Content
+    $content = Download-Text $RawUrl
 
     if (-not $content -or ($content -notmatch "HuntLista_Data")) {
-        throw "Pobrany plik nie wyglada na poprawny Data.lua (brak HuntLista_Data)"
+        throw "Pobrany plik nie wyglada na Data.lua (brak HuntLista_Data). Cache GitHuba? Sprobuj za 1 min."
     }
 
-    # Zapis bez BOM
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($targetFile, $content, $utf8NoBom)
+    try {
+        [System.IO.File]::WriteAllText($targetFile, $content, $utf8NoBom)
+    } catch {
+        throw "Nie moge zapisac do: $targetFile`n  $($_.Exception.Message)`n  Odpal BAT jako Administrator."
+    }
 
-    $version = "nieznana"
+    # Weryfikacja zapisu
+    $verify = [System.IO.File]::ReadAllText($targetFile)
+    if ($verify -notmatch "HuntLista_Data") {
+        throw "Zapisano plik, ale weryfikacja nie widzi HuntLista_Data"
+    }
+
+    $version = "?"
     $lastUpdate = ""
     if ($content -match 'version\s*=\s*"([^"]+)"') { $version = $Matches[1] }
     if ($content -match 'lastUpdate\s*=\s*"([^"]+)"') { $lastUpdate = $Matches[1] }
 
-    # Policz graczy (prosto)
-    $playerCount = ([regex]::Matches($content, '\["[^"]+"\]\s*=')).Count
+    $playerNames = [regex]::Matches($content, '\["([^"]+)"\]\s*=') | ForEach-Object { $_.Groups[1].Value }
+    $playerCount = $playerNames.Count
 
     Write-Host ""
     Write-Host "  ======================================" -ForegroundColor Green
     Write-Host "   AKTUALIZACJA UDANA" -ForegroundColor Green
     Write-Host "  ======================================" -ForegroundColor Green
-    Write-Host "  Wersja danych  : $version" -ForegroundColor White
+    Write-Host "  Wersja danych   : $version" -ForegroundColor White
     if ($lastUpdate) {
-        Write-Host "  Ostatnia zmiana: $lastUpdate" -ForegroundColor White
+        Write-Host "  Ostatnia zmiana : $lastUpdate" -ForegroundColor White
     }
     Write-Host "  Graczy na liscie: $playerCount" -ForegroundColor White
+    if ($playerCount -gt 0) {
+        Write-Host "  Nicki:" -ForegroundColor DarkGray
+        foreach ($n in $playerNames) {
+            Write-Host "    - $n" -ForegroundColor Gray
+        }
+    }
     Write-Host ""
     Write-Host "  W grze wpisz:  /reload" -ForegroundColor Yellow
+    Write-Host "  Potem:         /hl status" -ForegroundColor Yellow
     Write-Host ""
 }
 catch {
     Write-Host ""
-    Write-Host "  [BLAD] Nie udalo sie pobrac / zapisac pliku:" -ForegroundColor Red
-    Write-Host "  $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "  [BLAD] $($_.Exception.Message)" -ForegroundColor Red
     Write-Host ""
-    Write-Host "  Sprawdz:" -ForegroundColor Yellow
-    Write-Host "  1. Czy masz internet" -ForegroundColor Gray
-    Write-Host "  2. Czy repo istnieje: https://github.com/$RepoOwner/$RepoName" -ForegroundColor Gray
-    Write-Host "  3. Czy folder addona nie jest chroniony (odpal jako Administrator)" -ForegroundColor Gray
+    Write-Host "  Co sprobowac:" -ForegroundColor Yellow
+    Write-Host "  1. Usun updater-config.txt i odpal ponownie" -ForegroundColor Gray
+    Write-Host "  2. Odpal BAT jako Administrator" -ForegroundColor Gray
+    Write-Host "  3. Sprawdz w przegladarce:" -ForegroundColor Gray
+    Write-Host "     https://raw.githubusercontent.com/$RepoOwner/$RepoName/main/$DataPathInRepo" -ForegroundColor DarkGray
     Write-Host ""
     Pause-Exit 1
 }
