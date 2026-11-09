@@ -4,17 +4,11 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.2",
-    lastUpdate = "2026-11-09 10:36",
+    version = "2026-11-09.3",
+    lastUpdate = "2026-11-09 10:56",
     updatedBy = "DiscordBot",
 
     players = {
-        ["Mr Morix"] = {
-            reason = "",
-            addedBy = "frethborn",
-            addedAt = "2026-11-09",
-            note = "",
-        },
     }
 }
 
