@@ -17,7 +17,16 @@ Gildyjny addon do oznaczania konkretnych graczy PvP w **WoW Forever**.
    World of Warcraft\_forever_\Interface\AddOns\
    ```
 2. Włącz addon na ekranie wyboru postaci.
-3. Po aktualizacji danych przez bota → pobierz nowy `Data.lua` z repo i nadpisz w folderze addona, potem `/reload`.
+
+## Aktualizacja listy (zalecane)
+
+Użyj **Updatera** (folder `updater/` w repo):
+
+1. Skopiuj folder `updater` np. na Pulpit
+2. Dwuklik na `Update-HuntLista.bat`
+3. W grze `/reload`
+
+Updater sam ściąga najnowszy `Data.lua` z GitHuba i nadpisuje plik w folderze addona.
 
 ## Komendy w grze
 
@@ -31,8 +40,8 @@ Gildyjny addon do oznaczania konkretnych graczy PvP w **WoW Forever**.
 
 1. Ktoś na Discordzie używa `/hunt add Nick "powód"`
 2. Bot aktualizuje plik `Data.lua` na GitHubie
-3. Gracze ściągają nowy `Data.lua` (albo cały addon) i wrzucają do folderu
-4. W grze `/reload` lub relog
+3. Gracze odpalają **Update-HuntLista.bat** (albo ściągają ręcznie)
+4. W grze `/reload`
 
 ---
 
