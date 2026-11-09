@@ -5,9 +5,8 @@
 local addonName, ns = ...
 local HL = ns.HL or HuntLista
 
--- Cooldown na alerty
 local lastAlert = {}
-local ALERT_COOLDOWN = 8 -- sekund
+local ALERT_COOLDOWN = 8
 
 local function CanAlert(name)
     local now = GetTime()
@@ -23,8 +22,10 @@ function HL:CheckUnit(unit)
     if not UnitExists(unit) then return end
     if not UnitIsPlayer(unit) then return end
 
-    -- Tylko wrogowie (przeciwna frakcja)
-    if not UnitIsEnemy("player", unit) then return end
+    -- Test mode: alertuj tez sojusznikow. Normalnie tylko wrogowie.
+    if not HuntListaDB.testMode then
+        if not UnitIsEnemy("player", unit) then return end
+    end
 
     local name = UnitName(unit)
     if not name then return end
@@ -32,7 +33,6 @@ function HL:CheckUnit(unit)
     local info = HL:GetInfo(name)
     if not info then return end
 
-    -- Alert tekstowy + dzwiek
     if CanAlert(name) then
         local reason = info.reason ~= "" and (" - " .. info.reason) or ""
         local msg = "|cffff0000[HUNT]|r |cffffff00" .. info.name .. "|r" .. reason
@@ -45,13 +45,11 @@ function HL:CheckUnit(unit)
         end
     end
 
-    -- Ikonka na nameplate / target
     if HuntListaDB.showIcon then
         HL:ShowHuntIcon(unit, info)
     end
 end
 
--- Prosta ikonka (czerwona czaszka)
 local iconPool = {}
 
 local function GetIcon()
@@ -87,11 +85,12 @@ function HL:ShowHuntIcon(unit, info)
     end
 end
 
--- Hook na nameplates
 local function OnNamePlateAdded(unit)
     if not HuntListaDB.showIcon then return end
     if not UnitIsPlayer(unit) then return end
-    if not UnitIsEnemy("player", unit) then return end
+    if not HuntListaDB.testMode then
+        if not UnitIsEnemy("player", unit) then return end
+    end
 
     local name = UnitName(unit)
     if not HL:IsOnList(name) then return end

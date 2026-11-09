@@ -6,10 +6,9 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.0.0"
+HL.version = "1.0.1-test"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
--- Domyslne ustawienia
 local defaults = {
     enabled = true,
     sound = true,
@@ -18,6 +17,7 @@ local defaults = {
     alertOnMouseover = true,
     showIcon = true,
     minimapButton = true,
+    testMode = false,
 }
 
 local function InitDB()
@@ -31,7 +31,6 @@ local function InitDB()
     end
 end
 
--- Buduje szybki lookup (case-insensitive)
 local function RebuildLookup()
     wipe(HuntLista_Lookup)
     if not HuntLista_Data or not HuntLista_Data.players then return end
@@ -66,7 +65,6 @@ function HL:GetPlayerCount()
     return count
 end
 
--- Eventy
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
@@ -82,6 +80,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
             RebuildLookup()
             print("|cff00ff00Hunt Lista|r zaladowane. Wersja danych: |cffffff00" .. HL.dataVersion .. "|r  (" .. HL:GetPlayerCount() .. " graczy)")
             print("Komenda: |cffffff00/hl|r  lub  |cffffff00/huntlista|r")
+            if HuntListaDB.testMode then
+                print("|cffff0000TEST MODE ON|r - alertuje tez sojusznikow. /hl test off aby wylaczyc")
+            end
         end
     elseif event == "PLAYER_LOGIN" then
         RebuildLookup()
@@ -101,7 +102,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
--- Slash commands
 SLASH_HUNTLISTA1 = "/hl"
 SLASH_HUNTLISTA2 = "/huntlista"
 SlashCmdList["HUNTLISTA"] = function(msg)
@@ -114,17 +114,25 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Wersja danych: " .. HL.dataVersion)
         print("  Graczy na liscie: " .. HL:GetPlayerCount())
         print("  Ostatnia aktualizacja: " .. (HuntLista_Data and HuntLista_Data.lastUpdate or "?"))
+        print("  Test mode: " .. (HuntListaDB.testMode and "|cffff0000ON|r" or "OFF"))
     elseif msg == "reload" or msg == "odswiez" then
         RebuildLookup()
         print("|cff00ff00Hunt Lista|r - dane odswiezone. Graczy: " .. HL:GetPlayerCount())
+    elseif msg == "test" or msg == "test on" then
+        HuntListaDB.testMode = true
+        print("|cff00ff00Hunt Lista|r TEST MODE: ON - alertuje tez sojusznikow")
+    elseif msg == "test off" then
+        HuntListaDB.testMode = false
+        print("|cff00ff00Hunt Lista|r TEST MODE: OFF - tylko wrogowie")
     else
         print("|cff00ff00Hunt Lista|r komendy:")
         print("  /hl          - otworz liste")
         print("  /hl status   - status danych")
         print("  /hl reload   - przeladuj lookup")
+        print("  /hl test     - wlacz test (sojusznicy tez)")
+        print("  /hl test off - wylacz test (tylko wrogowie)")
     end
 end
 
--- Eksport dla innych plikow
 ns.HL = HL
 ns.RebuildLookup = RebuildLookup
