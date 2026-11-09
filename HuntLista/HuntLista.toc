@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: Hunt Lista
+## Notes: Gildyjna lista graczy PvP do polowania. Dane aktualizowane z GitHuba.
+## Author: Gildia
+## Version: 1.0.0
+## SavedVariables: HuntListaDB
+## DefaultState: enabled
+
+Data.lua
+Core.lua
+UI.lua
+Alerts.lua
