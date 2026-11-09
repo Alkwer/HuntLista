@@ -1,5 +1,5 @@
 -- ============================================================
--- Hunt Lista - Okienko po smierci (bez taintu) + cache pelnych nickow
+-- Hunt Lista - Okienko po smierci z nickiem do skopiowania
 -- ============================================================
 
 local addonName, ns = ...
@@ -10,14 +10,11 @@ local lastAttackerName = nil
 local lastAttackerTime = 0
 local deathFrame
 
--- Forever: UnitName/CLEU zwraca "Mowie", nameplate pokazuje "Mowie Cowie"
--- Cache: pierwsze_slowo(lower) -> najdluzsza widziana pelna nazwa
 HL.NameCache = HL.NameCache or {}
 
 local function StripRealm(name)
     if not name or name == "" then return nil end
     name = strtrim(name)
-    -- usun kody kolorow
     name = name:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
     name = name:gsub("|T.-|t", "")
     local base = name:match("^(.-)%-[^%-]+$")
@@ -29,7 +26,7 @@ end
 
 local function FirstWord(name)
     if not name then return nil end
-    return strlower(strtrim(name):match("^(%S+)") or name)
+    return strlower((strtrim(name):match("^(%S+)") or name))
 end
 
 function HL:CacheFullName(full)
@@ -51,7 +48,6 @@ function HL:ResolveFullName(name)
     if cached and #cached >= #name then
         return cached
     end
-    -- jesli na liscie jest dluzszy wariant
     if HL.GetInfo then
         local info = HL:GetInfo(name)
         if info and info.name and #info.name >= #name then
@@ -68,68 +64,27 @@ function HL:CacheUnit(unit)
     local n = UnitName(unit)
     if n then HL:CacheFullName(n) end
 
-    -- nameplate fontstring czesto ma PELNA nazwe w Forever
     if C_NamePlate and C_NamePlate.GetNamePlateForUnit then
         local plate = C_NamePlate.GetNamePlateForUnit(unit)
         if plate and plate.UnitFrame then
             local uf = plate.UnitFrame
-            local candidates = {}
             if uf.name and uf.name.GetText then
-                table.insert(candidates, uf.name:GetText())
+                local t = uf.name:GetText()
+                if t then HL:CacheFullName(t) end
             end
             if uf.Name and uf.Name.GetText then
-                table.insert(candidates, uf.Name:GetText())
-            end
-            -- czasem name jest dzieckiem
-            if uf.GetRegions then
-                local regions = { uf:GetRegions() }
-                for _, r in ipairs(regions) do
-                    if r and r.GetObjectType and r:GetObjectType() == "FontString" and r.GetText then
-                        local t = r:GetText()
-                        if t and #t > 1 and not t:find("%%") then
-                            table.insert(candidates, t)
-                        end
-                    end
-                end
-            end
-            for _, t in ipairs(candidates) do
-                if t and n and #StripRealm(t) or 0 >= #(n or "") then
-                    HL:CacheFullName(t)
-                elseif t then
-                    HL:CacheFullName(t)
-                end
+                local t = uf.Name:GetText()
+                if t then HL:CacheFullName(t) end
             end
         end
     end
-end
-
-local function MakeButton(parent, width, text)
-    local b = CreateFrame("Button", nil, parent)
-    b:SetSize(width, 26)
-    b.bg = b:CreateTexture(nil, "BACKGROUND")
-    b.bg:SetAllPoints()
-    b.bg:SetColorTexture(0.15, 0.15, 0.15, 0.95)
-    b.border = b:CreateTexture(nil, "BORDER")
-    b.border:SetPoint("TOPLEFT", -1, 1)
-    b.border:SetPoint("BOTTOMRIGHT", 1, -1)
-    b.border:SetColorTexture(0.45, 0.1, 0.1, 0.9)
-    b.label = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    b.label:SetPoint("CENTER")
-    b.label:SetText(text)
-    b:SetScript("OnEnter", function(self)
-        self.bg:SetColorTexture(0.3, 0.1, 0.1, 1)
-    end)
-    b:SetScript("OnLeave", function(self)
-        self.bg:SetColorTexture(0.15, 0.15, 0.15, 0.95)
-    end)
-    return b
 end
 
 local function CreateDeathFrame()
     if deathFrame then return deathFrame end
 
     local f = CreateFrame("Frame", "HuntListaDeathFrame", UIParent, "BackdropTemplate")
-    f:SetSize(360, 130)
+    f:SetSize(340, 150)
     f:SetPoint("CENTER", 0, 120)
     f:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
@@ -150,23 +105,74 @@ local function CreateDeathFrame()
     title:SetPoint("TOP", 0, -16)
     title:SetText("|cffff4444Zabil cie|r")
 
-    local hint = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hint:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    hint:SetTextColor(0.65, 0.65, 0.65)
-    hint:SetText("Nick tez jest w chacie - latwo skopiowac")
+    local sub = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    sub:SetPoint("TOP", title, "BOTTOM", 0, -4)
+    sub:SetTextColor(0.7, 0.7, 0.7)
+    sub:SetText("Kliknij w nick, Ctrl+C aby skopiowac")
 
-    local nameFS = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-    nameFS:SetPoint("TOP", hint, "BOTTOM", 0, -12)
-    nameFS:SetTextColor(1, 0.85, 0.2)
-    f.nameFS = nameFS
+    -- EditBox do kopiowania (bez auto-focus przy smierci)
+    local eb = CreateFrame("EditBox", nil, f)
+    eb:SetSize(260, 32)
+    eb:SetPoint("TOP", sub, "BOTTOM", 0, -12)
+    eb:SetAutoFocus(false)
+    eb:SetFontObject("GameFontHighlightLarge")
+    eb:SetJustifyH("CENTER")
+    eb:SetTextInsets(8, 8, 0, 0)
+    eb:SetMaxLetters(64)
+
+    local bg = eb:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.12, 0.12, 0.12, 0.95)
+
+    eb:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+        f:Hide()
+    end)
+    eb:SetScript("OnMouseDown", function(self)
+        self:SetFocus()
+        self:HighlightText()
+    end)
+    eb:SetScript("OnEditFocusGained", function(self)
+        self:HighlightText()
+    end)
+    f.editBox = eb
 
     local onList = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    onList:SetPoint("TOP", nameFS, "BOTTOM", 0, -8)
+    onList:SetPoint("TOP", eb, "BOTTOM", 0, -8)
     f.onListText = onList
 
-    local close = MakeButton(f, 100, "Zamknij")
-    close:SetPoint("BOTTOM", 0, 14)
-    close:SetScript("OnClick", function() f:Hide() end)
+    local function MakeBtn(w, label)
+        local b = CreateFrame("Button", nil, f)
+        b:SetSize(w, 26)
+        local t = b:CreateTexture(nil, "BACKGROUND")
+        t:SetAllPoints()
+        t:SetColorTexture(0.2, 0.05, 0.05, 0.95)
+        b.bg = t
+        local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        fs:SetPoint("CENTER")
+        fs:SetText(label)
+        b:SetScript("OnEnter", function()
+            t:SetColorTexture(0.35, 0.1, 0.1, 1)
+        end)
+        b:SetScript("OnLeave", function()
+            t:SetColorTexture(0.2, 0.05, 0.05, 0.95)
+        end)
+        return b
+    end
+
+    local selectBtn = MakeBtn(110, "Zaznacz")
+    selectBtn:SetPoint("BOTTOMLEFT", 28, 14)
+    selectBtn:SetScript("OnClick", function()
+        eb:SetFocus()
+        eb:HighlightText()
+    end)
+
+    local close = MakeBtn(110, "Zamknij")
+    close:SetPoint("BOTTOMRIGHT", -28, 14)
+    close:SetScript("OnClick", function()
+        eb:ClearFocus()
+        f:Hide()
+    end)
 
     deathFrame = f
     return f
@@ -176,12 +182,13 @@ function HL:ShowKillerPopup(name)
     if HuntListaDB and HuntListaDB.deathPopup == false then return end
     if not name or name == "" then return end
 
-    -- sprobuj uzupelnic pelna nazwe z cache / listy
     name = HL:ResolveFullName(name)
     if not name then return end
 
     local f = CreateDeathFrame()
-    f.nameFS:SetText(name)
+
+    -- NIE robimy SetFocus automatycznie (taint) - user klika w pole / Zaznacz
+    f.editBox:SetText(name)
 
     local info = HL.GetInfo and HL:GetInfo(name) or nil
     if info then
@@ -190,17 +197,18 @@ function HL:ShowKillerPopup(name)
         f.onListText:SetText("|cffaaaaaaNie ma na liscie - wklej na Discord|r")
     end
 
-    -- chat = pewne kopiowanie bez taintu
     print("|cffff4444[Hunt Lista]|r Zabojca: |cffffff00" .. name .. "|r")
 
     f:Show()
 end
 
 function HL:HideKillerPopup()
-    if deathFrame then deathFrame:Hide() end
+    if deathFrame then
+        if deathFrame.editBox then deathFrame.editBox:ClearFocus() end
+        deathFrame:Hide()
+    end
 end
 
--- Cache nazw z nameplate / target / mouseover
 local cacheFrame = CreateFrame("Frame")
 cacheFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 cacheFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -218,7 +226,6 @@ cacheFrame:SetScript("OnEvent", function(_, event, unit)
     end
 end)
 
--- Combat log + smierc
 local cleu = CreateFrame("Frame")
 cleu:RegisterEvent("PLAYER_DEAD")
 cleu:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
@@ -253,7 +260,6 @@ cleu:SetScript("OnEvent", function(_, event)
 
             lastAttackerName = sourceName
             lastAttackerTime = GetTime()
-            -- od razu sprobuj cache
             HL:CacheFullName(sourceName)
 
         elseif subevent == "UNIT_DIED" then
