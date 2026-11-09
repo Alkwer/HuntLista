@@ -1,5 +1,5 @@
 -- ============================================================
--- Hunt Lista - Okno z listą
+-- Hunt Lista - Okno z lista
 -- ============================================================
 
 local addonName, ns = ...
@@ -27,7 +27,7 @@ local function CreateListFrame()
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
     f:Hide()
 
-    -- Tytuł
+    -- Tytul
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -18)
     title:SetText("|cffff4444Hunt Lista|r")
@@ -38,7 +38,7 @@ local function CreateListFrame()
     ver:SetTextColor(0.7, 0.7, 0.7)
     f.versionText = ver
 
-    -- Przycisk zamknięcia
+    -- Przycisk zamkniecia
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -4, -4)
     close:SetScript("OnClick", function() f:Hide() end)
@@ -58,7 +58,7 @@ local function CreateListFrame()
     local footer = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     footer:SetPoint("BOTTOM", 0, 18)
     footer:SetTextColor(0.6, 0.6, 0.6)
-    footer:SetText("Dane z GitHuba • aktualizuj addon gdy bot wrzuci nową wersję")
+    footer:SetText("Dane z GitHuba - aktualizuj addon gdy bot wrzuci nowa wersje")
     f.footer = footer
 
     listFrame = f
@@ -69,7 +69,7 @@ function HL:RefreshList()
     local f = CreateListFrame()
     local content = f.content
 
-    -- Czyścimy
+    -- Czyscimy
     for i = content:GetNumChildren(), 1, -1 do
         local child = select(i, content:GetChildren())
         child:Hide()
@@ -92,7 +92,7 @@ function HL:RefreshList()
     if #players == 0 then
         local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         empty:SetPoint("TOP", 0, y)
-        empty:SetText("Lista jest pusta.\nBot jeszcze nikogo nie dodał.")
+        empty:SetText("Lista jest pusta.\nBot jeszcze nikogo nie dodal.")
         empty:SetTextColor(0.6, 0.6, 0.6)
         content:SetHeight(40)
     else
@@ -101,7 +101,7 @@ function HL:RefreshList()
             row:SetSize(360, 36)
             row:SetPoint("TOPLEFT", 0, y)
 
-            -- Tło na hover
+            -- Tlo na hover
             local bg = row:CreateTexture(nil, "BACKGROUND")
             bg:SetAllPoints()
             bg:SetColorTexture(1, 1, 1, 0.04)
@@ -120,17 +120,17 @@ function HL:RefreshList()
             nameFS:SetPoint("LEFT", icon, "RIGHT", 8, 4)
             nameFS:SetText("|cffff6666" .. info.name .. "|r")
 
-            -- Powód / notatka
+            -- Powod / notatka
             local reasonFS = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             reasonFS:SetPoint("LEFT", icon, "RIGHT", 8, -10)
             reasonFS:SetTextColor(0.75, 0.75, 0.75)
             local extra = info.reason
             if info.note and info.note ~= "" then
-                extra = extra .. (extra ~= "" and " • " or "") .. info.note
+                extra = extra .. (extra ~= "" and " - " or "") .. info.note
             end
-            reasonFS:SetText(extra ~= "" and extra or "—")
+            reasonFS:SetText(extra ~= "" and extra or "-")
 
-            -- Kto dodał
+            -- Kto dodal
             if info.addedBy and info.addedBy ~= "" then
                 local by = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                 by:SetPoint("RIGHT", -8, 0)
@@ -178,7 +178,7 @@ local function CreateMinimapButton()
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("Hunt Lista")
-        GameTooltip:AddLine("Kliknij, aby otworzyć listę", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Kliknij, aby otworzyc liste", 0.8, 0.8, 0.8)
         GameTooltip:AddLine("Graczy: " .. HL:GetPlayerCount(), 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)

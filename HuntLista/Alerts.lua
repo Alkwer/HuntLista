@@ -5,7 +5,7 @@
 local addonName, ns = ...
 local HL = ns.HL or HuntLista
 
--- Cooldown na alerty (żeby nie spamowało)
+-- Cooldown na alerty
 local lastAlert = {}
 local ALERT_COOLDOWN = 8 -- sekund
 
@@ -32,12 +32,11 @@ function HL:CheckUnit(unit)
     local info = HL:GetInfo(name)
     if not info then return end
 
-    -- Alert tekstowy + dźwięk
+    -- Alert tekstowy + dzwiek
     if CanAlert(name) then
-        local reason = info.reason ~= "" and (" – " .. info.reason) or ""
+        local reason = info.reason ~= "" and (" - " .. info.reason) or ""
         local msg = "|cffff0000[HUNT]|r |cffffff00" .. info.name .. "|r" .. reason
 
-        -- Raid warning style
         RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
         print(msg)
 
@@ -52,7 +51,7 @@ function HL:CheckUnit(unit)
     end
 end
 
--- Prosta ikonka (czerwona czaszka / target)
+-- Prosta ikonka (czerwona czaszka)
 local iconPool = {}
 
 local function GetIcon()
@@ -65,7 +64,7 @@ local function GetIcon()
     icon:SetSize(24, 24)
     icon.tex = icon:CreateTexture(nil, "OVERLAY")
     icon.tex:SetAllPoints()
-    icon.tex:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8") -- czaszka
+    icon.tex:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
     icon.tex:SetVertexColor(1, 0.2, 0.2)
     icon:Hide()
     table.insert(iconPool, icon)
@@ -73,9 +72,6 @@ local function GetIcon()
 end
 
 function HL:ShowHuntIcon(unit, info)
-    -- Na razie prosty sposób: pokazuje ikonkę przy targetcie / mouseover
-    -- Pełna integracja z nameplates wymaga więcej kodu (hooki na nameplate frames)
-
     if unit == "target" or unit == "mouseover" then
         local icon = GetIcon()
         icon:ClearAllPoints()
@@ -84,7 +80,6 @@ function HL:ShowHuntIcon(unit, info)
             icon:SetParent(TargetFrame)
             icon:SetPoint("CENTER", TargetFrame, "TOP", 0, 12)
             icon:Show()
-            -- Auto hide po chwili
             C_Timer.After(6, function()
                 if icon:IsShown() then icon:Hide() end
             end)
@@ -92,7 +87,7 @@ function HL:ShowHuntIcon(unit, info)
     end
 end
 
--- Hook na nameplates (podstawowy)
+-- Hook na nameplates
 local function OnNamePlateAdded(unit)
     if not HuntListaDB.showIcon then return end
     if not UnitIsPlayer(unit) then return end
@@ -101,7 +96,6 @@ local function OnNamePlateAdded(unit)
     local name = UnitName(unit)
     if not HL:IsOnList(name) then return end
 
-    -- Próbujemy znaleźć frame nameplate
     local plate = C_NamePlate.GetNamePlateForUnit(unit)
     if not plate or not plate.UnitFrame then return end
 
@@ -116,7 +110,6 @@ local function OnNamePlateAdded(unit)
     uf.HuntListaIcon:Show()
 end
 
--- Podpinamy się do eventu nameplate
 local npFrame = CreateFrame("Frame")
 npFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 npFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")

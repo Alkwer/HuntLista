@@ -9,7 +9,7 @@ local HL = HuntLista
 HL.version = "1.0.0"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
--- Domyślne ustawienia
+-- Domyslne ustawienia
 local defaults = {
     enabled = true,
     sound = true,
@@ -39,7 +39,7 @@ local function RebuildLookup()
     for name, info in pairs(HuntLista_Data.players) do
         local key = strlower(name)
         HuntLista_Lookup[key] = {
-            name = name,          -- oryginalna wielkość liter
+            name = name,
             reason = info.reason or "",
             addedBy = info.addedBy or "",
             addedAt = info.addedAt or "",
@@ -80,7 +80,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
         if loaded == addonName then
             InitDB()
             RebuildLookup()
-            print("|cff00ff00Hunt Lista|r załadowane. Wersja danych: |cffffff00" .. HL.dataVersion .. "|r  (" .. HL:GetPlayerCount() .. " graczy)")
+            print("|cff00ff00Hunt Lista|r zaladowane. Wersja danych: |cffffff00" .. HL.dataVersion .. "|r  (" .. HL:GetPlayerCount() .. " graczy)")
             print("Komenda: |cffffff00/hl|r  lub  |cffffff00/huntlista|r")
         end
     elseif event == "PLAYER_LOGIN" then
@@ -112,19 +112,19 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("|cff00ff00Hunt Lista|r")
         print("  Wersja addona: " .. HL.version)
         print("  Wersja danych: " .. HL.dataVersion)
-        print("  Graczy na liście: " .. HL:GetPlayerCount())
+        print("  Graczy na liscie: " .. HL:GetPlayerCount())
         print("  Ostatnia aktualizacja: " .. (HuntLista_Data and HuntLista_Data.lastUpdate or "?"))
     elseif msg == "reload" or msg == "odswiez" then
         RebuildLookup()
-        print("|cff00ff00Hunt Lista|r – dane odświeżone. Graczy: " .. HL:GetPlayerCount())
+        print("|cff00ff00Hunt Lista|r - dane odswiezone. Graczy: " .. HL:GetPlayerCount())
     else
         print("|cff00ff00Hunt Lista|r komendy:")
-        print("  /hl          – otwórz listę")
-        print("  /hl status   – status danych")
-        print("  /hl reload   – przeładuj lookup")
+        print("  /hl          - otworz liste")
+        print("  /hl status   - status danych")
+        print("  /hl reload   - przeladuj lookup")
     end
 end
 
--- Eksport dla innych plików
+-- Eksport dla innych plikow
 ns.HL = HL
 ns.RebuildLookup = RebuildLookup
