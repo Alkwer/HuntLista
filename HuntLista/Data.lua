@@ -4,11 +4,17 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.15",
-    lastUpdate = "2026-11-09 21:07",
+    version = "2026-11-09.16",
+    lastUpdate = "2026-11-09 21:08",
     updatedBy = "DiscordBot",
 
     players = {
+        ["Aokingus Maximus"] = {
+            reason = "",
+            addedBy = "emwues",
+            addedAt = "2026-11-09",
+            note = "",
+        },
         ["Atemix Shadow"] = {
             reason = "",
             addedBy = "haczkes",
