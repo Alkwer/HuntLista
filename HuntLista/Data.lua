@@ -4,14 +4,20 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.2",
-    lastUpdate = "2026-11-09 12:50",
+    version = "2026-11-09.3",
+    lastUpdate = "2026-11-09 12:51",
     updatedBy = "DiscordBot",
 
     players = {
         ["Hacz Ling"] = {
             reason = "xd",
             addedBy = "frethborn",
+            addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Zdzichu Proncik"] = {
+            reason = "",
+            addedBy = "kkkelv",
             addedAt = "2026-11-09",
             note = "",
         },
