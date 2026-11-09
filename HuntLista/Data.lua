@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.18",
-    lastUpdate = "2026-11-09 21:46",
+    version = "2026-11-09.19",
+    lastUpdate = "2026-11-09 23:19",
     updatedBy = "DiscordBot",
 
     players = {
@@ -72,6 +72,12 @@ HuntLista_Data = {
         ["Spin Hero"] = {
             reason = "jego nie bijemy owo",
             addedBy = "riolumt",
+            addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Tollwütige Fledermaus"] = {
+            reason = "dziwka z trudnym nickiem",
+            addedBy = "gnatek",
             addedAt = "2026-11-09",
             note = "",
         },
