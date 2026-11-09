@@ -1,0 +1,14 @@
+{
+  "name": "huntlista-bot",
+  "version": "1.0.0",
+  "description": "Discord bot do zarządzania Hunt Lista + push na GitHub",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "octokit": "^4.0.2",
+    "dotenv": "^16.4.5"
+  }
+}
