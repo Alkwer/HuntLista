@@ -18,16 +18,16 @@ Lista jest wspólna dla gildii: dodajecie ludzi przez **bota na Discordzie**, a 
 | Alert + dźwięk | Raid warning gdy ktoś z listy jest w pobliżu / na targetcie |
 | Okno listy | `/hl` — podgląd całej listy |
 | Okienko po śmierci | Nick zabójcy do skopiowania (Ctrl+C) |
-| Updater | Skrypt Windows ściągający `Data.lua` z GitHuba |
-| Discord bot | `/hunt add` / `remove` / `list` → automatyczny push na GitHub |
+| Updater (ręczny) | Jednorazowe ściągnięcie `Data.lua` |
+| **Auto Updater** | Okno Windows — aktualizacja bazy co X minut |
+| Discord bot | `/hunt add` / `remove` / `list` → push na GitHub |
 | Tryb testowy | Alerty także na sojusznikach (do testów) |
 
 ---
 
 ## Instalacja addona
 
-1. Pobierz folder [`HuntLista/`](https://github.com/frethborn/HuntLista/tree/main/HuntLista)  
-   albo release z zakładki **Releases** (jeśli jest).
+1. Pobierz folder [`HuntLista/`](https://github.com/frethborn/HuntLista/tree/main/HuntLista)
 2. Wrzuć folder `HuntLista` do:
    ```
    World of Warcraft\_forever_\Interface\AddOns\
@@ -72,13 +72,25 @@ Alias: `/huntlista` działa tak samo jak `/hl`.
 
 Lista żyje w `HuntLista/Data.lua`. Gdy ktoś doda osobę przez Discord, plik zmienia się na GitHubie — trzeba go zaciągnąć do gry.
 
-### Opcja A — Updater (zalecane)
+### Opcja A — Auto Updater (zalecane)
+
+Folder: [`auto-updater/`](https://github.com/frethborn/HuntLista/tree/main/auto-updater)
+
+1. Pobierz folder `auto-updater`
+2. Odpal **`Start-AutoUpdater.bat`**
+3. Ustaw ścieżkę do `HuntLista` (często wykryje sam)
+4. Ustaw interwał (np. 5 minut) → **Start auto**
+5. Po każdym update w grze: `/hl reload` lub `/reload`
+
+Program musi działać w tle przy grze (WoW sam nie ściąga plików z netu).
+
+### Opcja B — Updater jednorazowy
 
 1. Pobierz folder [`updater/`](https://github.com/frethborn/HuntLista/tree/main/updater)
 2. Odpal **`Update-HuntLista.bat`**
-3. W grze: `/reload` (albo `/hl reload`)
+3. W grze: `/reload`
 
-### Opcja B — ręcznie
+### Opcja C — ręcznie
 
 1. Pobierz [Data.lua](https://raw.githubusercontent.com/frethborn/HuntLista/main/HuntLista/Data.lua)
 2. Nadpisz `Interface\AddOns\HuntLista\Data.lua`
@@ -93,9 +105,9 @@ Discord  →  /hunt add Nick "powod"
     ↓
 Bot zapisuje Data.lua na GitHubie
     ↓
-Gracze odpalaja updater (albo sciagaja Data.lua)
+Auto Updater / updater sciaga Data.lua
     ↓
-W grze /reload  →  czaszka + alert dzialaja
+W grze /hl reload  →  czaszka + alert dzialaja
 ```
 
 Po śmierci przeciwnika:
@@ -138,13 +150,14 @@ Folder: [`HuntListaBot/`](https://github.com/frethborn/HuntLista/tree/main/HuntL
 ```
 HuntLista/          ← addon do skopiowania do AddOns
   HuntLista.toc
-  Core.lua          ← komendy, lookup listy
-  Alerts.lua        ← czaszka, dzwieki, nameplate
-  UI.lua            ← okno listy /hl
-  Death.lua         ← okienko po smierci
-  Data.lua          ← lista graczy (aktualizowana przez bota)
+  Core.lua
+  Alerts.lua
+  UI.lua
+  Death.lua
+  Data.lua
 HuntListaBot/       ← bot Discord + push na GitHub
-updater/            ← skrypt Windows do sciagania Data.lua
+updater/            ← jednorazowy updater Windows
+auto-updater/       ← auto updater z GUI (co X minut)
 ```
 
 ---
