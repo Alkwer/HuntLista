@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-09.19",
-    lastUpdate = "2026-11-09 23:19",
+    version = "2026-11-10.1",
+    lastUpdate = "2026-11-10 16:08",
     updatedBy = "DiscordBot",
 
     players = {
@@ -25,6 +25,12 @@ HuntLista_Data = {
             reason = "",
             addedBy = "haczkes",
             addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Emo Uwu"] = {
+            reason = "caly klan przyzwal",
+            addedBy = "frethborn",
+            addedAt = "2026-11-10",
             note = "",
         },
         ["Gapped Teeth"] = {
