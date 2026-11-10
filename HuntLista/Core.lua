@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.1.6"
+HL.version = "1.1.7"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -41,7 +41,9 @@ local function RebuildLookup()
             addedAt = info.addedAt or "",
             note = info.note or "",
         }
-        if HL.CacheFullName then HL:CacheFullName(name) end
+        if HL.CacheFullName then
+            pcall(function() HL:CacheFullName(name) end)
+        end
     end
 end
 
@@ -78,7 +80,12 @@ function HL:GetPlayerCount()
     return count
 end
 
--- TYLKO eventy ktore dzialaly wczesniej (bez PLAYER_DEAD / CLEU)
+local function SafeCacheUnit(unit)
+    if HL.CacheUnit then
+        pcall(function() HL:CacheUnit(unit) end)
+    end
+end
+
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
@@ -98,20 +105,20 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "PLAYER_LOGIN" then
         RebuildLookup()
-        if HL.InitDeathModule then HL:InitDeathModule() end
+        if HL.InitDeathModule then pcall(function() HL:InitDeathModule() end) end
 
     elseif event == "PLAYER_TARGET_CHANGED" then
-        if HL.CacheUnit then HL:CacheUnit("target") end
-        if HL.OnTargetChangedDeath then HL:OnTargetChangedDeath() end
+        SafeCacheUnit("target")
+        if HL.OnTargetChangedDeath then pcall(function() HL:OnTargetChangedDeath() end) end
         if HuntListaDB and HuntListaDB.alertOnTarget then HL:CheckUnit("target") end
 
     elseif event == "UPDATE_MOUSEOVER_UNIT" then
-        if HL.CacheUnit then HL:CacheUnit("mouseover") end
+        SafeCacheUnit("mouseover")
         if HuntListaDB and HuntListaDB.alertOnMouseover then HL:CheckUnit("mouseover") end
 
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         local unit = ...
-        if HL.CacheUnit then HL:CacheUnit(unit) end
+        SafeCacheUnit(unit)
         if HuntListaDB and HuntListaDB.alertOnNameplate then HL:CheckUnit(unit) end
     end
 end)
@@ -139,6 +146,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
     elseif msg == "reload" or msg == "odswiez" then
         RebuildLookup()
         print("|cff00ff00Hunt Lista|r odswiezone. Graczy: " .. HL:GetPlayerCount())
+        print("|cffaaaaaa(To NIE wczytuje Data.lua z dysku - uzyj /reload UI)|r")
     elseif msg == "test" or msg == "test on" then
         HuntListaDB.testMode = true
         print("TEST MODE: ON")
@@ -160,7 +168,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         if name and name ~= "" then
             HuntLista:ShowKillerPopup(name)
         elseif UnitExists("target") and UnitName("target") then
-            if HL.CacheUnit then HL:CacheUnit("target") end
+            SafeCacheUnit("target")
             HuntLista:ShowKillerPopup(UnitName("target"))
         else
             HuntLista:ShowKillerPopup("Test Nick")
@@ -168,7 +176,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
     elseif msg == "check" then
         for _, unit in ipairs({"target", "mouseover"}) do
             if UnitExists(unit) then
-                if HL.CacheUnit then HL:CacheUnit(unit) end
+                SafeCacheUnit(unit)
                 local n = UnitName(unit)
                 local full = HL.ResolveFullName and HL:ResolveFullName(n) or n
                 print("  [" .. unit .. "] " .. tostring(n) .. " -> " .. tostring(full))
