@@ -1,13 +1,13 @@
 -- ============================================================
 -- Hunt Lista - Death.lua
--- BEZ RegisterEvent (Forever blokuje to z tego pliku)
--- Eventy lapie Core.lua i wywoluje handlery stad.
+-- Bez RegisterEvent / bez CLEU (Forever blokuje).
+-- Smierc: OnUpdate (UnitIsDeadOrGhost).
+-- Zabojca: ostatni wrogi gracz na targetcie w walce.
 -- ============================================================
 
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-local playerGUID
 local lastAttackerName = nil
 local lastAttackerTime = 0
 local deathFrame
@@ -235,9 +235,9 @@ local function TryShowOnDeath(source)
     local name = lastAttackerName
     local age = lastAttackerName and (GetTime() - lastAttackerTime) or 999
 
-    if (not name or age > 30) and UnitExists("target") and UnitIsPlayer("target") then
+    -- fallback: aktualny target jesli to gracz
+    if (not name or age > 45) and UnitExists("target") and UnitIsPlayer("target") then
         name = UnitName("target")
-        HL:CacheUnit("target")
         age = 0
     end
 
@@ -247,68 +247,34 @@ local function TryShowOnDeath(source)
             .. " age=" .. string.format("%.1f", age))
     end
 
-    if name and age <= 30 then
+    if name and age <= 45 then
         popupShownForDeath = true
         HL:ShowKillerPopup(name)
-    end
-end
-
--- Wywolywane z Core.lua
-function HL:OnPlayerDead()
-    TryShowOnDeath("PLAYER_DEAD")
-end
-
-function HL:OnPlayerAlive()
-    popupShownForDeath = false
-    wasDead = false
-end
-
-local DAMAGE_EVENTS = {
-    SWING_DAMAGE = true,
-    RANGE_DAMAGE = true,
-    SPELL_DAMAGE = true,
-    SPELL_PERIODIC_DAMAGE = true,
-    SPELL_BUILDING_DAMAGE = true,
-    DAMAGE_SHIELD = true,
-    DAMAGE_SPLIT = true,
-    ENVIRONMENTAL_DAMAGE = true,
-    SPELL_INSTAKILL = true,
-}
-
-function HL:OnCombatLogEvent()
-    if not playerGUID then playerGUID = UnitGUID("player") end
-    if not playerGUID then return end
-
-    local _, subevent, _, sourceGUID, sourceName, _, _, destGUID = CombatLogGetCurrentEventInfo()
-
-    if not destGUID or destGUID ~= playerGUID then return end
-    if not sourceGUID or sourceGUID == playerGUID then return end
-    if not sourceName or sourceName == "" then return end
-
-    if DAMAGE_EVENTS[subevent] then
-        RememberAttacker(sourceName, subevent)
-    elseif subevent == "UNIT_DIED" then
-        TryShowOnDeath("UNIT_DIED")
+    elseif HuntListaDB and HuntListaDB.debug then
+        print("|cff888888[HL death]|r brak zabojcy do pokazania")
     end
 end
 
 function HL:OnTargetChangedDeath()
-    if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") then
-        if UnitAffectingCombat("player") then
+    if UnitExists("target") and UnitIsPlayer("target") then
+        if UnitCanAttack("player", "target") or (HuntListaDB and HuntListaDB.testMode) then
             RememberAttacker(UnitName("target"), "target")
         end
     end
 end
 
--- Fallback smierci bez eventow: poll HP (OnUpdate = OK, bez RegisterEvent)
-local healthFrame = CreateFrame("Frame")
-healthFrame:SetScript("OnUpdate", function(self, elapsed)
+-- Poll: target w walce + smierc (bez RegisterEvent)
+local poll = CreateFrame("Frame")
+poll:SetScript("OnUpdate", function(self, elapsed)
     self.t = (self.t or 0) + elapsed
-    if self.t < 0.2 then return end
+    if self.t < 0.15 then return end
     self.t = 0
 
-    if not playerGUID then
-        playerGUID = UnitGUID("player")
+    -- zapamietuj wrogiego gracza na targetcie podczas walki
+    if UnitAffectingCombat("player") then
+        if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") then
+            RememberAttacker(UnitName("target"), "combat-target")
+        end
     end
 
     local dead = UnitIsDeadOrGhost("player")
@@ -322,9 +288,8 @@ healthFrame:SetScript("OnUpdate", function(self, elapsed)
 end)
 
 function HL:InitDeathModule()
-    playerGUID = UnitGUID("player")
     if HL.NameCache then wipe(HL.NameCache) end
-    print("|cff00ff00Hunt Lista|r Death.lua OK (bez RegisterEvent)")
+    print("|cff00ff00Hunt Lista|r Death.lua OK (poll mode)")
 end
 
 HuntLista.ShowKillerPopup = HL.ShowKillerPopup
@@ -332,8 +297,5 @@ HuntLista.HideKillerPopup = HL.HideKillerPopup
 HuntLista.CacheUnit = HL.CacheUnit
 HuntLista.CacheFullName = HL.CacheFullName
 HuntLista.ResolveFullName = HL.ResolveFullName
-HuntLista.OnPlayerDead = HL.OnPlayerDead
-HuntLista.OnPlayerAlive = HL.OnPlayerAlive
-HuntLista.OnCombatLogEvent = HL.OnCombatLogEvent
 HuntLista.OnTargetChangedDeath = HL.OnTargetChangedDeath
 HuntLista.InitDeathModule = HL.InitDeathModule
