@@ -9,6 +9,7 @@ local playerGUID
 local lastAttackerName = nil
 local lastAttackerTime = 0
 local deathFrame
+local initialized = false
 
 HL.NameCache = HL.NameCache or {}
 
@@ -21,7 +22,6 @@ local function CleanPlayerName(name)
     name = name:gsub("|r", "")
     name = name:gsub("|T.-|t", "")
 
-    -- tylko pierwsza linia
     local nl = name:find(string.char(10), 1, true)
     if nl then
         name = name:sub(1, nl - 1)
@@ -261,29 +261,10 @@ HuntLista.CacheUnit = HL.CacheUnit
 HuntLista.CacheFullName = HL.CacheFullName
 HuntLista.ResolveFullName = HL.ResolveFullName
 
-local cacheFrame = CreateFrame("Frame")
-cacheFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-cacheFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
-cacheFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
-cacheFrame:RegisterEvent("PLAYER_LOGIN")
-cacheFrame:SetScript("OnEvent", function(_, event, unit)
-    if event == "PLAYER_LOGIN" then
-        playerGUID = UnitGUID("player")
-        if HL.NameCache then wipe(HL.NameCache) end
-        print("|cff00ff00Hunt Lista|r Death.lua OK")
-    elseif event == "NAME_PLATE_UNIT_ADDED" then
-        HL:CacheUnit(unit)
-    elseif event == "PLAYER_TARGET_CHANGED" then
-        HL:CacheUnit("target")
-    elseif event == "UPDATE_MOUSEOVER_UNIT" then
-        HL:CacheUnit("mouseover")
-    end
-end)
+-- Eventy rejestrowane DOPIERO po logowaniu (unikamy ADDON_ACTION_FORBIDDEN)
+local eventFrame = CreateFrame("Frame")
 
-local cleu = CreateFrame("Frame")
-cleu:RegisterEvent("PLAYER_DEAD")
-cleu:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-cleu:SetScript("OnEvent", function(_, event)
+local function OnDeathEvent(_, event, ...)
     if event == "PLAYER_DEAD" then
         if lastAttackerName and (GetTime() - lastAttackerTime) < 20 then
             HL:ShowKillerPopup(lastAttackerName)
@@ -317,5 +298,55 @@ cleu:SetScript("OnEvent", function(_, event)
                 HL:ShowKillerPopup(lastAttackerName)
             end
         end
+        return
     end
-end)
+
+    if event == "NAME_PLATE_UNIT_ADDED" then
+        HL:CacheUnit(...)
+    elseif event == "PLAYER_TARGET_CHANGED" then
+        HL:CacheUnit("target")
+    elseif event == "UPDATE_MOUSEOVER_UNIT" then
+        HL:CacheUnit("mouseover")
+    end
+end
+
+local function InitDeathEvents()
+    if initialized then return end
+    initialized = true
+
+    playerGUID = UnitGUID("player")
+    if HL.NameCache then wipe(HL.NameCache) end
+
+    eventFrame:SetScript("OnEvent", OnDeathEvent)
+
+    -- pcall zeby jeden zabroniony event nie wywalil reszty
+    local events = {
+        "PLAYER_DEAD",
+        "COMBAT_LOG_EVENT_UNFILTERED",
+        "NAME_PLATE_UNIT_ADDED",
+        "PLAYER_TARGET_CHANGED",
+        "UPDATE_MOUSEOVER_UNIT",
+    }
+    for _, ev in ipairs(events) do
+        local ok, err = pcall(function()
+            eventFrame:RegisterEvent(ev)
+        end)
+        if not ok and HuntListaDB and HuntListaDB.debug then
+            print("|cff888888[HL]|r RegisterEvent fail: " .. tostring(ev))
+        end
+    end
+
+    print("|cff00ff00Hunt Lista|r Death.lua OK")
+end
+
+-- Start dopiero gdy gracz jest w swiecie (bezpieczne)
+if IsLoggedIn and IsLoggedIn() then
+    C_Timer.After(0.5, InitDeathEvents)
+else
+    local boot = CreateFrame("Frame")
+    boot:RegisterEvent("PLAYER_LOGIN")
+    boot:SetScript("OnEvent", function(self)
+        self:UnregisterAllEvents()
+        C_Timer.After(0.5, InitDeathEvents)
+    end)
+end
