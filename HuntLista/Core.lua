@@ -1,12 +1,13 @@
 -- ============================================================
 -- Hunt Lista - Core
+-- Eventy rejestrowane TUTAJ (Forever pozwala w main chunk)
 -- ============================================================
 
 local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.1.4"
+HL.version = "1.1.5"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -78,12 +79,16 @@ function HL:GetPlayerCount()
     return count
 end
 
+-- Wszystkie RegisterEvent TYLKO w main chunk Core (dziala na Forever)
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 frame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+frame:RegisterEvent("PLAYER_DEAD")
+frame:RegisterEvent("PLAYER_ALIVE")
+frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 
 frame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -94,21 +99,33 @@ frame:SetScript("OnEvent", function(self, event, ...)
             print("|cff00ff00Hunt Lista|r zaladowane. Wersja: |cffffff00" .. HL.version .. "|r  dane: " .. HL.dataVersion .. " (" .. HL:GetPlayerCount() .. " graczy)")
             print("Komenda: |cffffff00/hl|r")
         end
+
     elseif event == "PLAYER_LOGIN" then
         RebuildLookup()
-        if HL.InitDeathModule then
-            C_Timer.After(0.5, function() HL:InitDeathModule() end)
-        end
+        if HL.InitDeathModule then HL:InitDeathModule() end
+
+    elseif event == "PLAYER_DEAD" then
+        if HL.OnPlayerDead then HL:OnPlayerDead() end
+
+    elseif event == "PLAYER_ALIVE" then
+        if HL.OnPlayerAlive then HL:OnPlayerAlive() end
+
+    elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
+        if HL.OnCombatLogEvent then HL:OnCombatLogEvent() end
+
     elseif event == "PLAYER_TARGET_CHANGED" then
         if HL.CacheUnit then HL:CacheUnit("target") end
-        if HuntListaDB.alertOnTarget then HL:CheckUnit("target") end
+        if HL.OnTargetChangedDeath then HL:OnTargetChangedDeath() end
+        if HuntListaDB and HuntListaDB.alertOnTarget then HL:CheckUnit("target") end
+
     elseif event == "UPDATE_MOUSEOVER_UNIT" then
         if HL.CacheUnit then HL:CacheUnit("mouseover") end
-        if HuntListaDB.alertOnMouseover then HL:CheckUnit("mouseover") end
+        if HuntListaDB and HuntListaDB.alertOnMouseover then HL:CheckUnit("mouseover") end
+
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         local unit = ...
         if HL.CacheUnit then HL:CacheUnit(unit) end
-        if HuntListaDB.alertOnNameplate then HL:CheckUnit(unit) end
+        if HuntListaDB and HuntListaDB.alertOnNameplate then HL:CheckUnit(unit) end
     end
 end)
 

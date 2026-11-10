@@ -1,5 +1,7 @@
 -- ============================================================
--- Hunt Lista - Death.lua (okienko zabojcy)
+-- Hunt Lista - Death.lua
+-- BEZ RegisterEvent (Forever blokuje to z tego pliku)
+-- Eventy lapie Core.lua i wywoluje handlery stad.
 -- ============================================================
 
 HuntLista = HuntLista or {}
@@ -9,8 +11,8 @@ local playerGUID
 local lastAttackerName = nil
 local lastAttackerTime = 0
 local deathFrame
-local initialized = false
 local popupShownForDeath = false
+local wasDead = false
 
 HL.NameCache = HL.NameCache or {}
 
@@ -236,10 +238,7 @@ local function TryShowOnDeath(source)
     if (not name or age > 30) and UnitExists("target") and UnitIsPlayer("target") then
         name = UnitName("target")
         HL:CacheUnit("target")
-    end
-
-    if (not name or age > 30) and UnitExists("mouseover") and UnitIsPlayer("mouseover") then
-        name = UnitName("mouseover")
+        age = 0
     end
 
     if HuntListaDB and HuntListaDB.debug then
@@ -248,22 +247,21 @@ local function TryShowOnDeath(source)
             .. " age=" .. string.format("%.1f", age))
     end
 
-    if name and (age <= 30 or source == "manual") then
+    if name and age <= 30 then
         popupShownForDeath = true
         HL:ShowKillerPopup(name)
-    elseif HuntListaDB and HuntListaDB.debug then
-        print("|cff888888[HL death]|r brak zapisanego zabojcy")
     end
 end
 
-HuntLista.ShowKillerPopup = HL.ShowKillerPopup
-HuntLista.HideKillerPopup = HL.HideKillerPopup
-HuntLista.CacheUnit = HL.CacheUnit
-HuntLista.CacheFullName = HL.CacheFullName
-HuntLista.ResolveFullName = HL.ResolveFullName
+-- Wywolywane z Core.lua
+function HL:OnPlayerDead()
+    TryShowOnDeath("PLAYER_DEAD")
+end
 
-local eventFrame = CreateFrame("Frame")
-local healthFrame = CreateFrame("Frame")
+function HL:OnPlayerAlive()
+    popupShownForDeath = false
+    wasDead = false
+end
 
 local DAMAGE_EVENTS = {
     SWING_DAMAGE = true,
@@ -277,57 +275,41 @@ local DAMAGE_EVENTS = {
     SPELL_INSTAKILL = true,
 }
 
-local function OnDeathEvent(_, event, ...)
-    if event == "PLAYER_DEAD" or event == "PLAYER_ALIVE" then
-        if event == "PLAYER_ALIVE" then
-            popupShownForDeath = false
-            return
-        end
-        TryShowOnDeath("PLAYER_DEAD")
-        return
-    end
+function HL:OnCombatLogEvent()
+    if not playerGUID then playerGUID = UnitGUID("player") end
+    if not playerGUID then return end
 
-    if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        if not playerGUID then playerGUID = UnitGUID("player") end
-        if not playerGUID then return end
+    local _, subevent, _, sourceGUID, sourceName, _, _, destGUID = CombatLogGetCurrentEventInfo()
 
-        local timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags,
-              sourceRaidFlags, destGUID, destName, destFlags = CombatLogGetCurrentEventInfo()
+    if not destGUID or destGUID ~= playerGUID then return end
+    if not sourceGUID or sourceGUID == playerGUID then return end
+    if not sourceName or sourceName == "" then return end
 
-        if not destGUID or destGUID ~= playerGUID then return end
-        if not sourceGUID or sourceGUID == playerGUID then return end
-        if not sourceName or sourceName == "" then return end
-
-        if DAMAGE_EVENTS[subevent] then
-            RememberAttacker(sourceName, subevent)
-        elseif subevent == "UNIT_DIED" then
-            TryShowOnDeath("UNIT_DIED")
-        end
-        return
-    end
-
-    if event == "NAME_PLATE_UNIT_ADDED" then
-        HL:CacheUnit(...)
-    elseif event == "PLAYER_TARGET_CHANGED" then
-        HL:CacheUnit("target")
-        -- jesli target to wrog i bije nas, zapamietaj
-        if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") then
-            if UnitAffectingCombat("player") then
-                RememberAttacker(UnitName("target"), "target")
-            end
-        end
-    elseif event == "UPDATE_MOUSEOVER_UNIT" then
-        HL:CacheUnit("mouseover")
+    if DAMAGE_EVENTS[subevent] then
+        RememberAttacker(sourceName, subevent)
+    elseif subevent == "UNIT_DIED" then
+        TryShowOnDeath("UNIT_DIED")
     end
 end
 
--- fallback: jak PLAYER_DEAD nie dziala na Forever
-local wasDead = false
+function HL:OnTargetChangedDeath()
+    if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") then
+        if UnitAffectingCombat("player") then
+            RememberAttacker(UnitName("target"), "target")
+        end
+    end
+end
+
+-- Fallback smierci bez eventow: poll HP (OnUpdate = OK, bez RegisterEvent)
+local healthFrame = CreateFrame("Frame")
 healthFrame:SetScript("OnUpdate", function(self, elapsed)
     self.t = (self.t or 0) + elapsed
-    if self.t < 0.25 then return end
+    if self.t < 0.2 then return end
     self.t = 0
-    if not initialized then return end
+
+    if not playerGUID then
+        playerGUID = UnitGUID("player")
+    end
 
     local dead = UnitIsDeadOrGhost("player")
     if dead and not wasDead then
@@ -340,36 +322,18 @@ healthFrame:SetScript("OnUpdate", function(self, elapsed)
 end)
 
 function HL:InitDeathModule()
-    if initialized then return end
-    initialized = true
-
     playerGUID = UnitGUID("player")
     if HL.NameCache then wipe(HL.NameCache) end
-
-    eventFrame:SetScript("OnEvent", OnDeathEvent)
-
-    local events = {
-        "PLAYER_DEAD",
-        "PLAYER_ALIVE",
-        "COMBAT_LOG_EVENT_UNFILTERED",
-        "NAME_PLATE_UNIT_ADDED",
-        "PLAYER_TARGET_CHANGED",
-        "UPDATE_MOUSEOVER_UNIT",
-    }
-    local okCount = 0
-    for _, ev in ipairs(events) do
-        local ok = pcall(function() eventFrame:RegisterEvent(ev) end)
-        if ok then okCount = okCount + 1 end
-    end
-
-    print("|cff00ff00Hunt Lista|r Death.lua OK (" .. okCount .. "/" .. #events .. " eventow)")
+    print("|cff00ff00Hunt Lista|r Death.lua OK (bez RegisterEvent)")
 end
 
+HuntLista.ShowKillerPopup = HL.ShowKillerPopup
+HuntLista.HideKillerPopup = HL.HideKillerPopup
+HuntLista.CacheUnit = HL.CacheUnit
+HuntLista.CacheFullName = HL.CacheFullName
+HuntLista.ResolveFullName = HL.ResolveFullName
+HuntLista.OnPlayerDead = HL.OnPlayerDead
+HuntLista.OnPlayerAlive = HL.OnPlayerAlive
+HuntLista.OnCombatLogEvent = HL.OnCombatLogEvent
+HuntLista.OnTargetChangedDeath = HL.OnTargetChangedDeath
 HuntLista.InitDeathModule = HL.InitDeathModule
-
-C_Timer.After(1, function()
-    if HL.InitDeathModule then HL:InitDeathModule() end
-end)
-C_Timer.After(3, function()
-    if HL.InitDeathModule then HL:InitDeathModule() end
-end)
