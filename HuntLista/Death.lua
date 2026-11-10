@@ -1,8 +1,5 @@
 -- ============================================================
--- Hunt Lista - Death.lua
--- Bez RegisterEvent / bez CLEU (Forever blokuje).
--- Smierc: OnUpdate (UnitIsDeadOrGhost).
--- Zabojca: ostatni wrogi gracz na targetcie w walce.
+-- Hunt Lista - Death.lua (poll mode, safe names)
 -- ============================================================
 
 HuntLista = HuntLista or {}
@@ -18,7 +15,6 @@ HL.NameCache = HL.NameCache or {}
 
 local function CleanPlayerName(name)
     if not name or name == "" then return nil end
-    -- secret string / non-string = odpuszczamy
     if type(name) ~= "string" then return nil end
 
     local ok, cleaned = pcall(function()
@@ -59,44 +55,78 @@ function HL:CacheFullName(full)
     local fw = FirstWord(full)
     if not fw or #fw < 2 then return end
     local prev = HL.NameCache[fw]
-    if not prev or (#full > #prev) then HL.NameCache[fw] = full end
+    if not prev or (#full > #prev) then
+        HL.NameCache[fw] = full
+    end
+end
+
+-- Uzupelnij cache z Data.lua (pelne nicki ze spacjami)
+local function SeedCacheFromData()
+    if not HuntLista_Data or not HuntLista_Data.players then return end
+    for name, _ in pairs(HuntLista_Data.players) do
+        HL:CacheFullName(name)
+    end
 end
 
 function HL:ResolveFullName(name)
     name = CleanPlayerName(name)
     if not name then return nil end
+
     local fw = FirstWord(name)
+
+    -- 1) cache (lista + widziane jednostki)
     local cached = fw and HL.NameCache[fw]
     if cached then
         cached = CleanPlayerName(cached)
         if cached and #cached >= #name then return cached end
     end
+
+    -- 2) lookup hunt listy (fuzzy pierwsze slowo)
     if HL.GetInfo then
         local info = HL:GetInfo(name)
         if info and info.name then
             local n = CleanPlayerName(info.name)
-            if n and #n >= #name then return n end
+            if n then return n end
         end
     end
+
+    -- 3) surowe skanowanie Data.lua
+    if HuntLista_Data and HuntLista_Data.players and fw then
+        for full, _ in pairs(HuntLista_Data.players) do
+            local key = strlower(strtrim(full))
+            if key == fw or key:sub(1, #fw + 1) == fw .. " " then
+                return CleanPlayerName(full) or full
+            end
+        end
+    end
+
     return name
 end
 
 function HL:CacheUnit(unit)
     if not unit or not UnitExists(unit) then return end
     if not UnitIsPlayer(unit) then return end
-    -- TYLKO UnitName - NIE czytamy FontString nameplate (secret string / taint)
     local n = UnitName(unit)
     if n and type(n) == "string" then
-        HL:CacheFullName(n)
+        -- UnitName bywa tylko pierwsze slowo - i tak sprobuj expanded z listy
+        local expanded = HL:ResolveFullName(n)
+        HL:CacheFullName(expanded or n)
     end
 end
 
 local function RememberAttacker(name, reason)
+    if type(name) ~= "string" then return end
     name = CleanPlayerName(name)
     if not name then return end
+
+    -- od razu pelna forma z listy jesli jest
+    local full = HL:ResolveFullName(name)
+    if full then name = full end
+
     lastAttackerName = name
     lastAttackerTime = GetTime()
     HL:CacheFullName(name)
+
     if HuntListaDB and HuntListaDB.debug then
         print("|cff888888[HL death]|r attacker=" .. name .. " (" .. tostring(reason) .. ")")
     end
@@ -203,7 +233,9 @@ function HL:ShowKillerPopup(name)
     if HuntListaDB and HuntListaDB.deathPopup == false then return end
     if not name or name == "" then return end
 
-    name = HL:ResolveFullName(name)
+    -- zawsze sprobuj pelnej formy
+    SeedCacheFromData()
+    name = HL:ResolveFullName(name) or name
     name = CleanPlayerName(name)
     if not name then return end
 
@@ -243,7 +275,7 @@ local function TryShowOnDeath(source)
     if (not name or age > 45) and UnitExists("target") and UnitIsPlayer("target") then
         local tn = UnitName("target")
         if type(tn) == "string" then
-            name = tn
+            name = HL:ResolveFullName(tn) or tn
             age = 0
         end
     end
@@ -299,7 +331,8 @@ poll:SetScript("OnUpdate", function(self, elapsed)
 end)
 
 function HL:InitDeathModule()
-    if HL.NameCache then wipe(HL.NameCache) end
+    -- NIE wipe'uj cache - tam sa pelne nicki z Data.lua
+    SeedCacheFromData()
     print("|cff00ff00Hunt Lista|r Death.lua OK (poll mode)")
 end
 
