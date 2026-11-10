@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-10.3",
-    lastUpdate = "2026-11-10 16:21",
+    version = "2026-11-10.4",
+    lastUpdate = "2026-11-10 17:05",
     updatedBy = "DiscordBot",
 
     players = {
@@ -31,6 +31,12 @@ HuntLista_Data = {
             reason = "",
             addedBy = "haczkes",
             addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Dzordzo Automaty"] = {
+            reason = "cwel engaguje 3v1 bo boi się wyjść na solówkę, a i tak umiera xdd",
+            addedBy = "kkkelv",
+            addedAt = "2026-11-10",
             note = "",
         },
         ["Emo Uwu"] = {
