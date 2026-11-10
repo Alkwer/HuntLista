@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-10.4",
-    lastUpdate = "2026-11-10 17:05",
+    version = "2026-11-10.5",
+    lastUpdate = "2026-11-10 18:54",
     updatedBy = "DiscordBot",
 
     players = {
@@ -19,6 +19,12 @@ HuntLista_Data = {
             reason = "",
             addedBy = "haczkes",
             addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Call Hr"] = {
+            reason = "pedal kampi na escort quescie xddd",
+            addedBy = "frethborn",
+            addedAt = "2026-11-10",
             note = "",
         },
         ["Dekdruid Dekland"] = {
