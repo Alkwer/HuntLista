@@ -261,7 +261,6 @@ HuntLista.CacheUnit = HL.CacheUnit
 HuntLista.CacheFullName = HL.CacheFullName
 HuntLista.ResolveFullName = HL.ResolveFullName
 
--- Eventy rejestrowane DOPIERO po logowaniu (unikamy ADDON_ACTION_FORBIDDEN)
 local eventFrame = CreateFrame("Frame")
 
 local function OnDeathEvent(_, event, ...)
@@ -310,7 +309,7 @@ local function OnDeathEvent(_, event, ...)
     end
 end
 
-local function InitDeathEvents()
+function HL:InitDeathModule()
     if initialized then return end
     initialized = true
 
@@ -319,7 +318,6 @@ local function InitDeathEvents()
 
     eventFrame:SetScript("OnEvent", OnDeathEvent)
 
-    -- pcall zeby jeden zabroniony event nie wywalil reszty
     local events = {
         "PLAYER_DEAD",
         "COMBAT_LOG_EVENT_UNFILTERED",
@@ -328,25 +326,15 @@ local function InitDeathEvents()
         "UPDATE_MOUSEOVER_UNIT",
     }
     for _, ev in ipairs(events) do
-        local ok, err = pcall(function()
-            eventFrame:RegisterEvent(ev)
-        end)
-        if not ok and HuntListaDB and HuntListaDB.debug then
-            print("|cff888888[HL]|r RegisterEvent fail: " .. tostring(ev))
-        end
+        pcall(function() eventFrame:RegisterEvent(ev) end)
     end
 
     print("|cff00ff00Hunt Lista|r Death.lua OK")
 end
 
--- Start dopiero gdy gracz jest w swiecie (bezpieczne)
-if IsLoggedIn and IsLoggedIn() then
-    C_Timer.After(0.5, InitDeathEvents)
-else
-    local boot = CreateFrame("Frame")
-    boot:RegisterEvent("PLAYER_LOGIN")
-    boot:SetScript("OnEvent", function(self)
-        self:UnregisterAllEvents()
-        C_Timer.After(0.5, InitDeathEvents)
-    end)
-end
+HuntLista.InitDeathModule = HL.InitDeathModule
+
+-- ZERO RegisterEvent w main chunk - tylko timer (omija ADDON_ACTION_FORBIDDEN)
+C_Timer.After(1, function()
+    if HL.InitDeathModule then HL:InitDeathModule() end
+end)
