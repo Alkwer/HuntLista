@@ -16,31 +16,50 @@ local function CleanPlayerName(name)
     if not name or name == "" then return nil end
     name = tostring(name)
     name = strtrim(name)
+
+    -- kody kolorow
     name = name:gsub("|c%x%x%x%x%x%x%x%x", "")
     name = name:gsub("|r", "")
     name = name:gsub("|T.-|t", "")
-    name = name:match("([^
-]+)") or name
-    name = strtrim(name)
-    if name:match("^<.*>$") then return nil end
-    name = name:gsub("%s*<.->%s*", " ")
-    local before, after = name:match("^(.-)%-([^%-]+)$")
-    if before and after and not after:find(" ") then
-        name = before
+
+    -- tylko pierwsza linia (druga bywa gildia)
+    local newlinePos = name:find("\n", 1, true)
+    if newlinePos then
+        name = name:sub(1, newlinePos - 1)
     end
-    name = strtrim(name:gsub("%s+", " "))
+    name = strtrim(name)
+
+    -- tag gildii <...>
+    if name:sub(1, 1) == "<" and name:sub(-1) == ">" then
+        return nil
+    end
+    name = name:gsub(" *<[^>]*> *", " ")
+    name = strtrim(name)
+
+    -- realm: Name-Realm (bez spacji w realmie)
+    local dash = name:match("^(.+)%-([^%- ]+)$")
+    if dash then
+        local before = name:match("^(.+)%-[^%- ]+$")
+        if before then name = before end
+    end
+
+    name = strtrim(name)
+    name = name:gsub("  +", " ")
     if name == "" then return nil end
     return name
 end
 
 local function FirstWord(name)
     if not name then return nil end
-    return strlower(strtrim(name):match("^(%S+)") or name)
+    local w = strtrim(name):match("^(%S+)")
+    if not w then return nil end
+    return strlower(w)
 end
 
 function HL:CacheFullName(full)
     full = CleanPlayerName(full)
-    if not full or full:find("<") then return end
+    if not full then return end
+    if full:find("<") then return end
     local fw = FirstWord(full)
     if not fw or #fw < 2 then return end
     local prev = HL.NameCache[fw]
@@ -79,7 +98,9 @@ function HL:CacheUnit(unit)
             local uf = plate.UnitFrame
             if uf.name and uf.name.GetText then
                 local t = uf.name:GetText()
-                if t and not t:match("^<") then HL:CacheFullName(t) end
+                if t and t:sub(1, 1) ~= "<" then
+                    HL:CacheFullName(t)
+                end
             end
         end
     end
@@ -238,7 +259,6 @@ function HL:HideKillerPopup()
     end
 end
 
--- jawne przypisanie (na wszelki wypadek)
 HuntLista.ShowKillerPopup = HL.ShowKillerPopup
 HuntLista.HideKillerPopup = HL.HideKillerPopup
 HuntLista.CacheUnit = HL.CacheUnit
