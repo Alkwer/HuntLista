@@ -10,6 +10,7 @@ local lastAttackerName = nil
 local lastAttackerTime = 0
 local deathFrame
 local initialized = false
+local popupShownForDeath = false
 
 HL.NameCache = HL.NameCache or {}
 
@@ -17,28 +18,17 @@ local function CleanPlayerName(name)
     if not name or name == "" then return nil end
     name = tostring(name)
     name = strtrim(name)
-
     name = name:gsub("|c%x%x%x%x%x%x%x%x", "")
     name = name:gsub("|r", "")
     name = name:gsub("|T.-|t", "")
-
     local nl = name:find(string.char(10), 1, true)
-    if nl then
-        name = name:sub(1, nl - 1)
-    end
+    if nl then name = name:sub(1, nl - 1) end
     name = strtrim(name)
-
-    if name:sub(1, 1) == "<" and name:sub(-1) == ">" then
-        return nil
-    end
+    if name:sub(1, 1) == "<" and name:sub(-1) == ">" then return nil end
     name = name:gsub(" *<[^>]*> *", " ")
     name = strtrim(name)
-
     local before = name:match("^(.+)%-[^%- ]+$")
-    if before then
-        name = before
-    end
-
+    if before then name = before end
     name = strtrim(name)
     name = name:gsub("  +", " ")
     if name == "" then return nil end
@@ -54,14 +44,11 @@ end
 
 function HL:CacheFullName(full)
     full = CleanPlayerName(full)
-    if not full then return end
-    if full:find("<") then return end
+    if not full or full:find("<") then return end
     local fw = FirstWord(full)
     if not fw or #fw < 2 then return end
     local prev = HL.NameCache[fw]
-    if not prev or (#full > #prev) then
-        HL.NameCache[fw] = full
-    end
+    if not prev or (#full > #prev) then HL.NameCache[fw] = full end
 end
 
 function HL:ResolveFullName(name)
@@ -90,15 +77,21 @@ function HL:CacheUnit(unit)
     if n then HL:CacheFullName(n) end
     if C_NamePlate and C_NamePlate.GetNamePlateForUnit then
         local plate = C_NamePlate.GetNamePlateForUnit(unit)
-        if plate and plate.UnitFrame then
-            local uf = plate.UnitFrame
-            if uf.name and uf.name.GetText then
-                local t = uf.name:GetText()
-                if t and t:sub(1, 1) ~= "<" then
-                    HL:CacheFullName(t)
-                end
-            end
+        if plate and plate.UnitFrame and plate.UnitFrame.name and plate.UnitFrame.name.GetText then
+            local t = plate.UnitFrame.name:GetText()
+            if t and t:sub(1, 1) ~= "<" then HL:CacheFullName(t) end
         end
+    end
+end
+
+local function RememberAttacker(name, reason)
+    name = CleanPlayerName(name)
+    if not name then return end
+    lastAttackerName = name
+    lastAttackerTime = GetTime()
+    HL:CacheFullName(name)
+    if HuntListaDB and HuntListaDB.debug then
+        print("|cff888888[HL death]|r attacker=" .. name .. " (" .. tostring(reason) .. ")")
     end
 end
 
@@ -147,25 +140,17 @@ local function CreateDeathFrame()
     bg:SetColorTexture(0.12, 0.12, 0.12, 0.95)
 
     eb:SetScript("OnEscapePressed", function(self)
-        self:ClearFocus()
-        self:EnableKeyboard(false)
-        f:Hide()
+        self:ClearFocus(); self:EnableKeyboard(false); f:Hide()
     end)
     eb:SetScript("OnMouseDown", function(self)
-        self:EnableKeyboard(true)
-        self:SetFocus()
-        self:HighlightText()
+        self:EnableKeyboard(true); self:SetFocus(); self:HighlightText()
     end)
     eb:SetScript("OnEditFocusGained", function(self)
-        self:EnableKeyboard(true)
-        self:HighlightText()
+        self:EnableKeyboard(true); self:HighlightText()
     end)
-    eb:SetScript("OnEditFocusLost", function(self)
-        self:EnableKeyboard(false)
-    end)
+    eb:SetScript("OnEditFocusLost", function(self) self:EnableKeyboard(false) end)
     eb:SetScript("OnEnterPressed", function(self)
-        self:ClearFocus()
-        self:EnableKeyboard(false)
+        self:ClearFocus(); self:EnableKeyboard(false)
     end)
     f.editBox = eb
 
@@ -190,22 +175,17 @@ local function CreateDeathFrame()
     local selectBtn = MakeBtn(110, "Zaznacz")
     selectBtn:SetPoint("BOTTOMLEFT", 28, 14)
     selectBtn:SetScript("OnClick", function()
-        eb:EnableKeyboard(true)
-        eb:SetFocus()
-        eb:HighlightText()
+        eb:EnableKeyboard(true); eb:SetFocus(); eb:HighlightText()
     end)
 
     local close = MakeBtn(110, "Zamknij")
     close:SetPoint("BOTTOMRIGHT", -28, 14)
     close:SetScript("OnClick", function()
-        eb:ClearFocus()
-        eb:EnableKeyboard(false)
-        f:Hide()
+        eb:ClearFocus(); eb:EnableKeyboard(false); f:Hide()
     end)
 
     f:SetScript("OnHide", function()
-        eb:ClearFocus()
-        eb:EnableKeyboard(false)
+        eb:ClearFocus(); eb:EnableKeyboard(false)
     end)
 
     deathFrame = f
@@ -213,21 +193,12 @@ local function CreateDeathFrame()
 end
 
 function HL:ShowKillerPopup(name)
-    if HuntListaDB and HuntListaDB.deathPopup == false then
-        print("|cff00ff00Hunt Lista|r death popup OFF (/hl death)")
-        return
-    end
-    if not name or name == "" then
-        print("|cff00ff00Hunt Lista|r brak nicku")
-        return
-    end
+    if HuntListaDB and HuntListaDB.deathPopup == false then return end
+    if not name or name == "" then return end
 
     name = HL:ResolveFullName(name)
     name = CleanPlayerName(name)
-    if not name then
-        print("|cff00ff00Hunt Lista|r nie udalo sie odczytac nicku")
-        return
-    end
+    if not name then return end
 
     local f = CreateDeathFrame()
     f.editBox:EnableKeyboard(false)
@@ -255,6 +226,36 @@ function HL:HideKillerPopup()
     end
 end
 
+local function TryShowOnDeath(source)
+    if popupShownForDeath then return end
+    if HuntListaDB and HuntListaDB.deathPopup == false then return end
+
+    local name = lastAttackerName
+    local age = lastAttackerName and (GetTime() - lastAttackerTime) or 999
+
+    if (not name or age > 30) and UnitExists("target") and UnitIsPlayer("target") then
+        name = UnitName("target")
+        HL:CacheUnit("target")
+    end
+
+    if (not name or age > 30) and UnitExists("mouseover") and UnitIsPlayer("mouseover") then
+        name = UnitName("mouseover")
+    end
+
+    if HuntListaDB and HuntListaDB.debug then
+        print("|cff888888[HL death]|r TryShow source=" .. tostring(source)
+            .. " last=" .. tostring(lastAttackerName)
+            .. " age=" .. string.format("%.1f", age))
+    end
+
+    if name and (age <= 30 or source == "manual") then
+        popupShownForDeath = true
+        HL:ShowKillerPopup(name)
+    elseif HuntListaDB and HuntListaDB.debug then
+        print("|cff888888[HL death]|r brak zapisanego zabojcy")
+    end
+end
+
 HuntLista.ShowKillerPopup = HL.ShowKillerPopup
 HuntLista.HideKillerPopup = HL.HideKillerPopup
 HuntLista.CacheUnit = HL.CacheUnit
@@ -262,16 +263,27 @@ HuntLista.CacheFullName = HL.CacheFullName
 HuntLista.ResolveFullName = HL.ResolveFullName
 
 local eventFrame = CreateFrame("Frame")
+local healthFrame = CreateFrame("Frame")
+
+local DAMAGE_EVENTS = {
+    SWING_DAMAGE = true,
+    RANGE_DAMAGE = true,
+    SPELL_DAMAGE = true,
+    SPELL_PERIODIC_DAMAGE = true,
+    SPELL_BUILDING_DAMAGE = true,
+    DAMAGE_SHIELD = true,
+    DAMAGE_SPLIT = true,
+    ENVIRONMENTAL_DAMAGE = true,
+    SPELL_INSTAKILL = true,
+}
 
 local function OnDeathEvent(_, event, ...)
-    if event == "PLAYER_DEAD" then
-        if lastAttackerName and (GetTime() - lastAttackerTime) < 20 then
-            HL:ShowKillerPopup(lastAttackerName)
-        elseif UnitExists("target") and UnitIsPlayer("target") then
-            HL:CacheUnit("target")
-            local n = UnitName("target")
-            if n then HL:ShowKillerPopup(n) end
+    if event == "PLAYER_DEAD" or event == "PLAYER_ALIVE" then
+        if event == "PLAYER_ALIVE" then
+            popupShownForDeath = false
+            return
         end
+        TryShowOnDeath("PLAYER_DEAD")
         return
     end
 
@@ -279,23 +291,17 @@ local function OnDeathEvent(_, event, ...)
         if not playerGUID then playerGUID = UnitGUID("player") end
         if not playerGUID then return end
 
-        local _, subevent, _, sourceGUID, sourceName, _, _, destGUID = CombatLogGetCurrentEventInfo()
-        if destGUID ~= playerGUID then return end
+        local timestamp, subevent, hideCaster, sourceGUID, sourceName, sourceFlags,
+              sourceRaidFlags, destGUID, destName, destFlags = CombatLogGetCurrentEventInfo()
+
+        if not destGUID or destGUID ~= playerGUID then return end
         if not sourceGUID or sourceGUID == playerGUID then return end
         if not sourceName or sourceName == "" then return end
 
-        if subevent == "SWING_DAMAGE"
-            or subevent == "RANGE_DAMAGE"
-            or subevent == "SPELL_DAMAGE"
-            or subevent == "SPELL_PERIODIC_DAMAGE"
-            or subevent == "SPELL_BUILDING_DAMAGE" then
-            lastAttackerName = sourceName
-            lastAttackerTime = GetTime()
-            HL:CacheFullName(sourceName)
+        if DAMAGE_EVENTS[subevent] then
+            RememberAttacker(sourceName, subevent)
         elseif subevent == "UNIT_DIED" then
-            if lastAttackerName and (GetTime() - lastAttackerTime) < 20 then
-                HL:ShowKillerPopup(lastAttackerName)
-            end
+            TryShowOnDeath("UNIT_DIED")
         end
         return
     end
@@ -304,10 +310,34 @@ local function OnDeathEvent(_, event, ...)
         HL:CacheUnit(...)
     elseif event == "PLAYER_TARGET_CHANGED" then
         HL:CacheUnit("target")
+        -- jesli target to wrog i bije nas, zapamietaj
+        if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") then
+            if UnitAffectingCombat("player") then
+                RememberAttacker(UnitName("target"), "target")
+            end
+        end
     elseif event == "UPDATE_MOUSEOVER_UNIT" then
         HL:CacheUnit("mouseover")
     end
 end
+
+-- fallback: jak PLAYER_DEAD nie dziala na Forever
+local wasDead = false
+healthFrame:SetScript("OnUpdate", function(self, elapsed)
+    self.t = (self.t or 0) + elapsed
+    if self.t < 0.25 then return end
+    self.t = 0
+    if not initialized then return end
+
+    local dead = UnitIsDeadOrGhost("player")
+    if dead and not wasDead then
+        wasDead = true
+        TryShowOnDeath("HEALTH")
+    elseif not dead and wasDead then
+        wasDead = false
+        popupShownForDeath = false
+    end
+end)
 
 function HL:InitDeathModule()
     if initialized then return end
@@ -320,21 +350,26 @@ function HL:InitDeathModule()
 
     local events = {
         "PLAYER_DEAD",
+        "PLAYER_ALIVE",
         "COMBAT_LOG_EVENT_UNFILTERED",
         "NAME_PLATE_UNIT_ADDED",
         "PLAYER_TARGET_CHANGED",
         "UPDATE_MOUSEOVER_UNIT",
     }
+    local okCount = 0
     for _, ev in ipairs(events) do
-        pcall(function() eventFrame:RegisterEvent(ev) end)
+        local ok = pcall(function() eventFrame:RegisterEvent(ev) end)
+        if ok then okCount = okCount + 1 end
     end
 
-    print("|cff00ff00Hunt Lista|r Death.lua OK")
+    print("|cff00ff00Hunt Lista|r Death.lua OK (" .. okCount .. "/" .. #events .. " eventow)")
 end
 
 HuntLista.InitDeathModule = HL.InitDeathModule
 
--- ZERO RegisterEvent w main chunk - tylko timer (omija ADDON_ACTION_FORBIDDEN)
 C_Timer.After(1, function()
+    if HL.InitDeathModule then HL:InitDeathModule() end
+end)
+C_Timer.After(3, function()
     if HL.InitDeathModule then HL:InitDeathModule() end
 end)

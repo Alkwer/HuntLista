@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.1.3"
+HL.version = "1.1.4"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -96,6 +96,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
         end
     elseif event == "PLAYER_LOGIN" then
         RebuildLookup()
+        if HL.InitDeathModule then
+            C_Timer.After(0.5, function() HL:InitDeathModule() end)
+        end
     elseif event == "PLAYER_TARGET_CHANGED" then
         if HL.CacheUnit then HL:CacheUnit("target") end
         if HuntListaDB.alertOnTarget then HL:CheckUnit("target") end
@@ -128,6 +131,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Graczy: " .. HL:GetPlayerCount())
         print("  Death module: " .. (HL.ShowKillerPopup and "OK" or "BRAK"))
         print("  Death popup: " .. ((HuntListaDB.deathPopup ~= false) and "ON" or "OFF"))
+        print("  Debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     elseif msg == "reload" or msg == "odswiez" then
         RebuildLookup()
         print("|cff00ff00Hunt Lista|r odswiezone. Graczy: " .. HL:GetPlayerCount())
@@ -146,8 +150,6 @@ SlashCmdList["HUNTLISTA"] = function(msg)
     elseif msg == "killer" or msg:match("^killer%s+") then
         if not HuntLista.ShowKillerPopup then
             print("|cffff0000Hunt Lista|r modul Death nie zaladowany.")
-            print("Sprawdz czy w HuntLista.toc jest linia: Death.lua")
-            print("i czy plik Death.lua lezy w folderze addona.")
             return
         end
         local name = msg:match("^killer%s+(.+)$")
@@ -158,7 +160,6 @@ SlashCmdList["HUNTLISTA"] = function(msg)
             HuntLista:ShowKillerPopup(UnitName("target"))
         else
             HuntLista:ShowKillerPopup("Test Nick")
-            print("|cff00ff00Hunt Lista|r brak targetu - testowy nick")
         end
     elseif msg == "check" then
         for _, unit in ipairs({"target", "mouseover"}) do
@@ -173,7 +174,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         HuntListaDB.debug = not HuntListaDB.debug
         print("debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     else
-        print("|cff00ff00Hunt Lista|r: /hl  /hl status  /hl killer  /hl death  /hl test")
+        print("|cff00ff00Hunt Lista|r: /hl  /hl status  /hl killer  /hl death  /hl test  /hl debug")
     end
 end
 
