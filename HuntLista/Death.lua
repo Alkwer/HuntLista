@@ -17,30 +17,26 @@ local function CleanPlayerName(name)
     name = tostring(name)
     name = strtrim(name)
 
-    -- kody kolorow
     name = name:gsub("|c%x%x%x%x%x%x%x%x", "")
     name = name:gsub("|r", "")
     name = name:gsub("|T.-|t", "")
 
-    -- tylko pierwsza linia (druga bywa gildia)
-    local newlinePos = name:find("\n", 1, true)
-    if newlinePos then
-        name = name:sub(1, newlinePos - 1)
+    -- tylko pierwsza linia
+    local nl = name:find(string.char(10), 1, true)
+    if nl then
+        name = name:sub(1, nl - 1)
     end
     name = strtrim(name)
 
-    -- tag gildii <...>
     if name:sub(1, 1) == "<" and name:sub(-1) == ">" then
         return nil
     end
     name = name:gsub(" *<[^>]*> *", " ")
     name = strtrim(name)
 
-    -- realm: Name-Realm (bez spacji w realmie)
-    local dash = name:match("^(.+)%-([^%- ]+)$")
-    if dash then
-        local before = name:match("^(.+)%-[^%- ]+$")
-        if before then name = before end
+    local before = name:match("^(.+)%-[^%- ]+$")
+    if before then
+        name = before
     end
 
     name = strtrim(name)
