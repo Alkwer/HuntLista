@@ -1,9 +1,9 @@
 -- ============================================================
--- Hunt Lista - Okienko po smierci z nickiem do skopiowania
+-- Hunt Lista - Death.lua (okienko zabojcy)
 -- ============================================================
 
-local addonName, ns = ...
-local HL = ns.HL or HuntLista
+HuntLista = HuntLista or {}
+local HL = HuntLista
 
 local playerGUID
 local lastAttackerName = nil
@@ -16,52 +16,35 @@ local function CleanPlayerName(name)
     if not name or name == "" then return nil end
     name = tostring(name)
     name = strtrim(name)
-
     name = name:gsub("|c%x%x%x%x%x%x%x%x", "")
     name = name:gsub("|r", "")
     name = name:gsub("|T.-|t", "")
-    name = name:gsub("|A.-|a", "")
-
     name = name:match("([^
 ]+)") or name
     name = strtrim(name)
-
-    if name:match("^<.*>$") then
-        return nil
-    end
+    if name:match("^<.*>$") then return nil end
     name = name:gsub("%s*<.->%s*", " ")
-    name = name:gsub("%s*%b<>%s*", " ")
-
     local before, after = name:match("^(.-)%-([^%-]+)$")
-    if before and after and not after:find(" ") and not before:find("<") then
+    if before and after and not after:find(" ") then
         name = before
     end
-
-    name = strtrim(name)
-    name = name:gsub("%s+", " ")
+    name = strtrim(name:gsub("%s+", " "))
     if name == "" then return nil end
     return name
 end
 
 local function FirstWord(name)
     if not name then return nil end
-    return strlower((strtrim(name):match("^(%S+)") or name))
+    return strlower(strtrim(name):match("^(%S+)") or name)
 end
 
 function HL:CacheFullName(full)
     full = CleanPlayerName(full)
-    if not full then return end
-    if full:find("<") or full:find(">") then return end
-
+    if not full or full:find("<") then return end
     local fw = FirstWord(full)
     if not fw or #fw < 2 then return end
-
     local prev = HL.NameCache[fw]
-    if not prev then
-        HL.NameCache[fw] = full
-    elseif #full > #prev and full:find(" ") then
-        HL.NameCache[fw] = full
-    elseif #full > #prev and not prev:find(" ") then
+    if not prev or (#full > #prev) then
         HL.NameCache[fw] = full
     end
 end
@@ -69,16 +52,12 @@ end
 function HL:ResolveFullName(name)
     name = CleanPlayerName(name)
     if not name then return nil end
-
     local fw = FirstWord(name)
     local cached = fw and HL.NameCache[fw]
     if cached then
         cached = CleanPlayerName(cached)
-        if cached and #cached >= #name then
-            return cached
-        end
+        if cached and #cached >= #name then return cached end
     end
-
     if HL.GetInfo then
         local info = HL:GetInfo(name)
         if info and info.name then
@@ -86,32 +65,21 @@ function HL:ResolveFullName(name)
             if n and #n >= #name then return n end
         end
     end
-
     return name
 end
 
 function HL:CacheUnit(unit)
     if not unit or not UnitExists(unit) then return end
     if not UnitIsPlayer(unit) then return end
-
     local n = UnitName(unit)
     if n then HL:CacheFullName(n) end
-
     if C_NamePlate and C_NamePlate.GetNamePlateForUnit then
         local plate = C_NamePlate.GetNamePlateForUnit(unit)
         if plate and plate.UnitFrame then
             local uf = plate.UnitFrame
             if uf.name and uf.name.GetText then
                 local t = uf.name:GetText()
-                if t and not t:match("^<") then
-                    HL:CacheFullName(t)
-                end
-            end
-            if uf.Name and uf.Name.GetText then
-                local t = uf.Name:GetText()
-                if t and not t:match("^<") then
-                    HL:CacheFullName(t)
-                end
+                if t and not t:match("^<") then HL:CacheFullName(t) end
             end
         end
     end
@@ -155,7 +123,6 @@ local function CreateDeathFrame()
     eb:SetJustifyH("CENTER")
     eb:SetTextInsets(8, 8, 0, 0)
     eb:SetMaxLetters(64)
-    eb:EnableMouse(true)
     eb:EnableKeyboard(false)
 
     local bg = eb:CreateTexture(nil, "BACKGROUND")
@@ -198,12 +165,8 @@ local function CreateDeathFrame()
         local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         fs:SetPoint("CENTER")
         fs:SetText(label)
-        b:SetScript("OnEnter", function()
-            t:SetColorTexture(0.35, 0.1, 0.1, 1)
-        end)
-        b:SetScript("OnLeave", function()
-            t:SetColorTexture(0.2, 0.05, 0.05, 0.95)
-        end)
+        b:SetScript("OnEnter", function() t:SetColorTexture(0.35, 0.1, 0.1, 1) end)
+        b:SetScript("OnLeave", function() t:SetColorTexture(0.2, 0.05, 0.05, 0.95) end)
         return b
     end
 
@@ -234,11 +197,11 @@ end
 
 function HL:ShowKillerPopup(name)
     if HuntListaDB and HuntListaDB.deathPopup == false then
-        print("|cff00ff00Hunt Lista|r death popup jest OFF (/hl death)")
+        print("|cff00ff00Hunt Lista|r death popup OFF (/hl death)")
         return
     end
     if not name or name == "" then
-        print("|cff00ff00Hunt Lista|r brak nicku zabojcy")
+        print("|cff00ff00Hunt Lista|r brak nicku")
         return
     end
 
@@ -275,6 +238,13 @@ function HL:HideKillerPopup()
     end
 end
 
+-- jawne przypisanie (na wszelki wypadek)
+HuntLista.ShowKillerPopup = HL.ShowKillerPopup
+HuntLista.HideKillerPopup = HL.HideKillerPopup
+HuntLista.CacheUnit = HL.CacheUnit
+HuntLista.CacheFullName = HL.CacheFullName
+HuntLista.ResolveFullName = HL.ResolveFullName
+
 local cacheFrame = CreateFrame("Frame")
 cacheFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 cacheFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -284,6 +254,7 @@ cacheFrame:SetScript("OnEvent", function(_, event, unit)
     if event == "PLAYER_LOGIN" then
         playerGUID = UnitGUID("player")
         if HL.NameCache then wipe(HL.NameCache) end
+        print("|cff00ff00Hunt Lista|r Death.lua OK")
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         HL:CacheUnit(unit)
     elseif event == "PLAYER_TARGET_CHANGED" then
@@ -298,9 +269,8 @@ cleu:RegisterEvent("PLAYER_DEAD")
 cleu:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 cleu:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_DEAD" then
-        local name = lastAttackerName
-        if name and (GetTime() - lastAttackerTime) < 20 then
-            HL:ShowKillerPopup(name)
+        if lastAttackerName and (GetTime() - lastAttackerTime) < 20 then
+            HL:ShowKillerPopup(lastAttackerName)
         elseif UnitExists("target") and UnitIsPlayer("target") then
             HL:CacheUnit("target")
             local n = UnitName("target")
@@ -314,7 +284,6 @@ cleu:SetScript("OnEvent", function(_, event)
         if not playerGUID then return end
 
         local _, subevent, _, sourceGUID, sourceName, _, _, destGUID = CombatLogGetCurrentEventInfo()
-
         if destGUID ~= playerGUID then return end
         if not sourceGUID or sourceGUID == playerGUID then return end
         if not sourceName or sourceName == "" then return end
@@ -324,11 +293,9 @@ cleu:SetScript("OnEvent", function(_, event)
             or subevent == "SPELL_DAMAGE"
             or subevent == "SPELL_PERIODIC_DAMAGE"
             or subevent == "SPELL_BUILDING_DAMAGE" then
-
             lastAttackerName = sourceName
             lastAttackerTime = GetTime()
             HL:CacheFullName(sourceName)
-
         elseif subevent == "UNIT_DIED" then
             if lastAttackerName and (GetTime() - lastAttackerTime) < 20 then
                 HL:ShowKillerPopup(lastAttackerName)
