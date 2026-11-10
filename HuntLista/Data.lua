@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-10.2",
-    lastUpdate = "2026-11-10 16:18",
+    version = "2026-11-10.3",
+    lastUpdate = "2026-11-10 16:21",
     updatedBy = "DiscordBot",
 
     players = {
@@ -55,6 +55,12 @@ HuntLista_Data = {
             reason = "cwel",
             addedBy = "haczkes",
             addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Magegirl Samegirl"] = {
+            reason = "kolega pedala",
+            addedBy = "frethborn",
+            addedAt = "2026-11-10",
             note = "",
         },
         ["Miss Smitey"] = {
