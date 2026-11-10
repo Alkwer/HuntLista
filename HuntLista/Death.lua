@@ -18,35 +18,44 @@ HL.NameCache = HL.NameCache or {}
 
 local function CleanPlayerName(name)
     if not name or name == "" then return nil end
-    name = tostring(name)
-    name = strtrim(name)
-    name = name:gsub("|c%x%x%x%x%x%x%x%x", "")
-    name = name:gsub("|r", "")
-    name = name:gsub("|T.-|t", "")
-    local nl = name:find(string.char(10), 1, true)
-    if nl then name = name:sub(1, nl - 1) end
-    name = strtrim(name)
-    if name:sub(1, 1) == "<" and name:sub(-1) == ">" then return nil end
-    name = name:gsub(" *<[^>]*> *", " ")
-    name = strtrim(name)
-    local before = name:match("^(.+)%-[^%- ]+$")
-    if before then name = before end
-    name = strtrim(name)
-    name = name:gsub("  +", " ")
-    if name == "" then return nil end
-    return name
+    -- secret string / non-string = odpuszczamy
+    if type(name) ~= "string" then return nil end
+
+    local ok, cleaned = pcall(function()
+        local n = strtrim(name)
+        n = n:gsub("|c%x%x%x%x%x%x%x%x", "")
+        n = n:gsub("|r", "")
+        n = n:gsub("|T.-|t", "")
+        local nl = n:find(string.char(10), 1, true)
+        if nl then n = n:sub(1, nl - 1) end
+        n = strtrim(n)
+        if #n > 0 and n:sub(1, 1) == "<" and n:sub(-1) == ">" then return nil end
+        n = n:gsub(" *<[^>]*> *", " ")
+        n = strtrim(n)
+        local before = n:match("^(.+)%-[^%- ]+$")
+        if before then n = before end
+        n = strtrim(n)
+        n = n:gsub("  +", " ")
+        if n == "" then return nil end
+        return n
+    end)
+
+    if ok then return cleaned end
+    return nil
 end
 
 local function FirstWord(name)
-    if not name then return nil end
-    local w = strtrim(name):match("^(%S+)")
-    if not w then return nil end
-    return strlower(w)
+    if not name or type(name) ~= "string" then return nil end
+    local ok, w = pcall(function()
+        return strlower(strtrim(name):match("^(%S+)") or name)
+    end)
+    if ok then return w end
+    return nil
 end
 
 function HL:CacheFullName(full)
     full = CleanPlayerName(full)
-    if not full or full:find("<") then return end
+    if not full then return end
     local fw = FirstWord(full)
     if not fw or #fw < 2 then return end
     local prev = HL.NameCache[fw]
@@ -75,14 +84,10 @@ end
 function HL:CacheUnit(unit)
     if not unit or not UnitExists(unit) then return end
     if not UnitIsPlayer(unit) then return end
+    -- TYLKO UnitName - NIE czytamy FontString nameplate (secret string / taint)
     local n = UnitName(unit)
-    if n then HL:CacheFullName(n) end
-    if C_NamePlate and C_NamePlate.GetNamePlateForUnit then
-        local plate = C_NamePlate.GetNamePlateForUnit(unit)
-        if plate and plate.UnitFrame and plate.UnitFrame.name and plate.UnitFrame.name.GetText then
-            local t = plate.UnitFrame.name:GetText()
-            if t and t:sub(1, 1) ~= "<" then HL:CacheFullName(t) end
-        end
+    if n and type(n) == "string" then
+        HL:CacheFullName(n)
     end
 end
 
@@ -235,10 +240,12 @@ local function TryShowOnDeath(source)
     local name = lastAttackerName
     local age = lastAttackerName and (GetTime() - lastAttackerTime) or 999
 
-    -- fallback: aktualny target jesli to gracz
     if (not name or age > 45) and UnitExists("target") and UnitIsPlayer("target") then
-        name = UnitName("target")
-        age = 0
+        local tn = UnitName("target")
+        if type(tn) == "string" then
+            name = tn
+            age = 0
+        end
     end
 
     if HuntListaDB and HuntListaDB.debug then
@@ -258,22 +265,26 @@ end
 function HL:OnTargetChangedDeath()
     if UnitExists("target") and UnitIsPlayer("target") then
         if UnitCanAttack("player", "target") or (HuntListaDB and HuntListaDB.testMode) then
-            RememberAttacker(UnitName("target"), "target")
+            local n = UnitName("target")
+            if type(n) == "string" then
+                RememberAttacker(n, "target")
+            end
         end
     end
 end
 
--- Poll: target w walce + smierc (bez RegisterEvent)
 local poll = CreateFrame("Frame")
 poll:SetScript("OnUpdate", function(self, elapsed)
     self.t = (self.t or 0) + elapsed
     if self.t < 0.15 then return end
     self.t = 0
 
-    -- zapamietuj wrogiego gracza na targetcie podczas walki
     if UnitAffectingCombat("player") then
         if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") then
-            RememberAttacker(UnitName("target"), "combat-target")
+            local n = UnitName("target")
+            if type(n) == "string" then
+                RememberAttacker(n, "combat-target")
+            end
         end
     end
 
