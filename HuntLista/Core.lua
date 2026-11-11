@@ -109,7 +109,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "PLAYER_TARGET_CHANGED" then
         SafeCacheUnit("target")
-        if HL.OnTargetChangedDeath then pcall(function() HL:OnTargetChangedDeath() end) end
         if HuntListaDB and HuntListaDB.alertOnTarget then HL:CheckUnit("target") end
 
     elseif event == "UPDATE_MOUSEOVER_UNIT" then
