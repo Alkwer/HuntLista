@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-11.3",
-    lastUpdate = "2026-11-11 18:41",
+    version = "2026-11-11.4",
+    lastUpdate = "2026-11-11 21:45",
     updatedBy = "DiscordBot",
 
     players = {
@@ -25,6 +25,12 @@ HuntLista_Data = {
             reason = "",
             addedBy = "haczkes",
             addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Brick Hands"] = {
+            reason = "zjeb",
+            addedBy = "frethborn",
+            addedAt = "2026-11-11",
             note = "",
         },
         ["Call Hr"] = {
