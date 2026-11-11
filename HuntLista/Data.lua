@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-10.5",
-    lastUpdate = "2026-11-10 18:54",
+    version = "2026-11-11.1",
+    lastUpdate = "2026-11-11 15:39",
     updatedBy = "DiscordBot",
 
     players = {
@@ -61,6 +61,12 @@ HuntLista_Data = {
             reason = "xd",
             addedBy = "frethborn",
             addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Luna Mon"] = {
+            reason = "cwel",
+            addedBy = "emwues",
+            addedAt = "2026-11-11",
             note = "",
         },
         ["Mag Bic"] = {
