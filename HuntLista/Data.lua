@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-11.2",
-    lastUpdate = "2026-11-11 18:39",
+    version = "2026-11-11.3",
+    lastUpdate = "2026-11-11 18:41",
     updatedBy = "DiscordBot",
 
     players = {
@@ -13,6 +13,12 @@ HuntLista_Data = {
             reason = "",
             addedBy = "emwues",
             addedAt = "2026-11-09",
+            note = "",
+        },
+        ["Arithos Firehammer"] = {
+            reason = "a on kampi na ciele xddd",
+            addedBy = "frethborn",
+            addedAt = "2026-11-11",
             note = "",
         },
         ["Atemix Shadow"] = {
