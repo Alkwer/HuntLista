@@ -80,7 +80,7 @@ Folder: [`auto-updater/`](https://github.com/frethborn/HuntLista/tree/main/auto-
 2. Odpal **`Start-AutoUpdater.bat`**
 3. Ustaw ścieżkę do `HuntLista` (często wykryje sam)
 4. Ustaw interwał (np. 5 minut) → **Start auto**
-5. Po każdym update w grze: `/hl reload` lub `/reload`
+5. Po każdym update w grze:`/reload`
 
 Program musi działać w tle przy grze (WoW sam nie ściąga plików z netu).
 
@@ -107,7 +107,7 @@ Bot zapisuje Data.lua na GitHubie
     ↓
 Auto Updater / updater sciaga Data.lua
     ↓
-W grze /hl reload  →  czaszka + alert dzialaja
+W grze /reload  →  czaszka + alert dzialaja
 ```
 
 Po śmierci przeciwnika:
