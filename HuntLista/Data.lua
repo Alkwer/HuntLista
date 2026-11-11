@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-11.1",
-    lastUpdate = "2026-11-11 15:39",
+    version = "2026-11-11.2",
+    lastUpdate = "2026-11-11 18:39",
     updatedBy = "DiscordBot",
 
     players = {
@@ -25,6 +25,12 @@ HuntLista_Data = {
             reason = "pedal kampi na escort quescie xddd",
             addedBy = "frethborn",
             addedAt = "2026-11-10",
+            note = "",
+        },
+        ["Danny Wizzbang"] = {
+            reason = "na afku zabil pedal",
+            addedBy = "frethborn",
+            addedAt = "2026-11-11",
             note = "",
         },
         ["Dekdruid Dekland"] = {
