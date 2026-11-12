@@ -7,7 +7,7 @@ local HL = ns.HL or HuntLista
 
 local listFrame
 
-local SOUND_ORDER = { "raid", "alarm", "bell", "tell", "map", "level", "aggro", "pvp" }
+local SOUND_ORDER = { "raid", "alarm", "bell", "tell", "map", "level", "aggro", "pvp", "gong" }
 
 local function MakeBtn(parent, w, h, label)
     local b = CreateFrame("Button", nil, parent)
@@ -95,7 +95,6 @@ local function CreateListFrame()
     close:SetPoint("TOPRIGHT", -4, -4)
     close:SetScript("OnClick", function() f:Hide() end)
 
-    -- lista
     local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 16, -55)
     scroll:SetPoint("BOTTOMRIGHT", -36, 78)
@@ -106,7 +105,6 @@ local function CreateListFrame()
     f.content = content
     f.scroll = scroll
 
-    -- pasek ustawien dzwieku
     local bar = CreateFrame("Frame", nil, f)
     bar:SetPoint("BOTTOMLEFT", 14, 14)
     bar:SetPoint("BOTTOMRIGHT", -14, 14)
@@ -126,16 +124,6 @@ local function CreateListFrame()
     soundToggle:SetScript("OnClick", function()
         if not HuntListaDB then HuntListaDB = {} end
         HuntListaDB.sound = not (HuntListaDB.sound ~= false)
-        -- po toggle: true/false jasno
-        if HuntListaDB.sound == false then
-            -- was on, now off - already set by not (true) = false when sound was true...
-        end
-        -- Poprawna logika: odwracamy aktualny stan
-        -- Powyzej: sound ~= false is ON. not ON = want OFF -> sound=false
-        -- Jesli bylo OFF (sound==false), not false = true, sound becomes true - wait:
-        -- HuntListaDB.sound = not (HuntListaDB.sound ~= false)
-        -- ON (nil/true): sound ~= false -> true, not true -> false. OK OFF
-        -- OFF (false): sound ~= false -> false, not false -> true. OK ON
         UpdateSoundUI(f)
         if HuntListaDB.sound ~= false and HL.PlayHuntSound then
             HL:PlayHuntSound()
@@ -183,6 +171,9 @@ function HL:RefreshList()
         child:Hide()
         child:SetParent(nil)
     end
+    if content.emptyLabel then
+        content.emptyLabel:Hide()
+    end
 
     local players = {}
     for key, info in pairs(HuntLista_Lookup) do
@@ -203,10 +194,15 @@ function HL:RefreshList()
 
     local y = -4
     if #players == 0 then
-        local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        if not content.emptyLabel then
+            content.emptyLabel = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        end
+        local empty = content.emptyLabel
+        empty:ClearAllPoints()
         empty:SetPoint("TOP", 0, y)
         empty:SetTextColor(0.7, 0.7, 0.7)
         empty:SetText("Lista pusta - dodaj na Discord: /hunt add")
+        empty:Show()
         content:SetHeight(40)
     else
         for _, info in ipairs(players) do

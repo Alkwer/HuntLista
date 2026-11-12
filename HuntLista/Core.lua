@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.3.4"
+HL.version = "1.3.5"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -33,6 +33,17 @@ HL.SoundPresets = {
     level = { label = "Level Up", ids = { 888, 5274 }, files = { "Sound\\Spells\\LevelUp.ogg", "Sound\\Interface\\igQuestListComplete.ogg" } },
     aggro = { label = "Quest / Fanfare", ids = { 878, 880 }, files = { "Sound\\Interface\\iQuestComplete.ogg", "Sound\\Interface\\igQuestListComplete.ogg" } },
     pvp = { label = "PVP Flag", ids = { 8174, 8192 }, files = { "Sound\\Interface\\PVPFlagTakenHorde.ogg", "Sound\\Interface\\PVPFlagTakenAlliance.ogg" } },
+    gong = {
+        label = "Gong",
+        ids = { 47355, 47345, 1489 },
+        files = {
+            "Sound\\Doodad\\G_GongTroll01.ogg",
+            "Sound\\Doodad\\G_GongTroll02.ogg",
+            "Sound\\Doodad\\IronForgeBell.ogg",
+            "Sound\\Spells\\ShaysBell.ogg",
+            "Sound\\Doodad\\BellTollHorde.ogg",
+        },
+    },
 }
 
 function HL:PlayHuntSound()
@@ -279,7 +290,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Discord sync: /hunt kill Nick  (potem Auto Updater)")
         print("  /hl status  /hl killer  /hl death  /hl test")
         print("  /hl guildkills on  /hl guildkills off")
-        print("  /hl sound  /hl sound test  /hl sound raid|alarm|bell|...")
+        print("  /hl sound  /hl sound test  /hl sound raid|alarm|bell|gong|...")
     end
 end
 
