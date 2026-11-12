@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.3.5"
+HL.version = "1.3.6"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -63,17 +63,6 @@ function HL:PlayHuntSound()
             pcall(PlaySoundFile, path, "Master")
         end
     end
-end
-
-function HL:ListSoundPresets()
-    local cur = (HuntListaDB and HuntListaDB.soundPreset) or "raid"
-    local on = not HuntListaDB or HuntListaDB.sound ~= false
-    print("|cff00ff00Hunt Lista|r dzwieki: " .. (on and "|cff88ff88ON|r" or "|cffff6666OFF|r") .. "  preset: |cffffff00" .. cur .. "|r")
-    for k, p in pairs(HL.SoundPresets) do
-        local mark = (k == cur) and " |cff88ff88<--|r" or ""
-        print("  |cffffff00" .. k .. "|r - " .. (p.label or k) .. mark)
-    end
-    print("  /hl sound <nazwa>  |  /hl sound test  |  /hl sound on/off")
 end
 
 local function InitDB()
@@ -237,10 +226,6 @@ SlashCmdList["HUNTLISTA"] = function(msg)
             HL:RecordKill(who, "manual")
             print("|cffaaaaaaZglos tez na Discord: /hunt kill " .. who .. "|r")
         end
-    elseif msg == "reload" or msg == "odswiez" then
-        RebuildLookup()
-        print("|cff00ff00Hunt Lista|r odswiezone. Graczy: " .. HL:GetPlayerCount())
-        print("|cffaaaaaa(To NIE wczytuje Data.lua z dysku - uzyj /reload UI)|r")
     elseif msg == "test" or msg == "test on" then
         HuntListaDB.testMode = true
         print("TEST MODE: ON")
@@ -268,20 +253,6 @@ SlashCmdList["HUNTLISTA"] = function(msg)
                 print("  [" .. unit .. "] " .. tostring(n) .. " -> " .. tostring(full))
             end
         end
-    elseif msg == "sound" or msg == "dzwiek" then HL:ListSoundPresets()
-    elseif msg == "sound on" or msg == "dzwiek on" then HuntListaDB.sound = true; print("sound: ON"); HL:PlayHuntSound()
-    elseif msg == "sound off" or msg == "dzwiek off" then HuntListaDB.sound = false; print("sound: OFF")
-    elseif msg == "sound test" or msg == "dzwiek test" then HuntListaDB.sound = true; print("sound test: " .. (HuntListaDB.soundPreset or "raid")); HL:PlayHuntSound()
-    elseif msg:match("^sound%s+") or msg:match("^dzwiek%s+") then
-        local which = strtrim((msg:match("^sound%s+(.+)$") or msg:match("^dzwiek%s+(.+)$") or ""))
-        if which == "test" then HuntListaDB.sound = true; HL:PlayHuntSound()
-        elseif which == "on" then HuntListaDB.sound = true; print("sound: ON"); HL:PlayHuntSound()
-        elseif which == "off" then HuntListaDB.sound = false; print("sound: OFF")
-        elseif HL.SoundPresets[which] then
-            HuntListaDB.soundPreset = which; HuntListaDB.sound = true
-            print("sound: |cffffff00" .. which .. "|r (" .. (HL.SoundPresets[which].label or which) .. ")")
-            HL:PlayHuntSound()
-        else print("|cffff0000Nieznany dzwiek:|r " .. tostring(which)); HL:ListSoundPresets() end
     elseif msg == "debug" then
         HuntListaDB.debug = not HuntListaDB.debug
         print("debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
@@ -290,7 +261,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Discord sync: /hunt kill Nick  (potem Auto Updater)")
         print("  /hl status  /hl killer  /hl death  /hl test")
         print("  /hl guildkills on  /hl guildkills off")
-        print("  /hl sound  /hl sound test  /hl sound raid|alarm|bell|gong|...")
+        print("  dzwiek: w oknie /hl (dolny pasek)")
     end
 end
 
