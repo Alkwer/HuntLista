@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-12.6",
-    lastUpdate = "2026-11-12 19:10",
+    version = "2026-11-12.7",
+    lastUpdate = "2026-11-12 20:11",
     updatedBy = "DiscordBot",
 
     players = {
@@ -184,6 +184,15 @@ HuntLista_Data = {
             reason = "pionek",
             addedBy = "frethborn",
             addedAt = "2026-11-09",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
+        ["Sauron Saruman"] = {
+            reason = "cwele tylko 2v1 jak pulniesz mobki potrafia xdd",
+            addedBy = "emwues",
+            addedAt = "2026-11-12",
             note = "",
             kills = "0",
             lastKillBy = "",
