@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.2.1"
+HL.version = "1.3.0"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -20,6 +20,7 @@ local defaults = {
     testMode = false,
     debug = false,
     deathPopup = true,
+    guildKillAlerts = true,
 }
 
 local function InitDB()
@@ -164,6 +165,13 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Zabojstwa gildii: " .. HL:GetSharedTotalKills())
         print("  Zabojstwa lokalne (Ty): " .. (HL.GetTotalKills and HL:GetTotalKills() or 0))
         print("  Death popup: " .. ((HuntListaDB.deathPopup ~= false) and "ON" or "OFF"))
+        print("  Powiadomienia gildii: " .. (HuntListaDB.guildKillAlerts and "ON" or "OFF") .. " (" .. (HL.guildKillStatus or "inicjalizacja") .. ")")
+    elseif msg == "guildkills" or msg == "guildkills on" then
+        HuntListaDB.guildKillAlerts = true
+        print("Powiadomienia gildii: ON")
+    elseif msg == "guildkills off" then
+        HuntListaDB.guildKillAlerts = false
+        print("Powiadomienia gildii: OFF")
     elseif msg == "kills" or msg == "zabojstwa" then
         print("|cff00ff00Hunt Lista|r Ranking (z Data.lua / gildia):")
         local rows = {}
@@ -242,6 +250,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("|cff00ff00Hunt Lista|r: /hl  /hl kills  /hl kill Nick")
         print("  Discord sync: /hunt kill Nick  (potem Auto Updater)")
         print("  /hl status  /hl killer  /hl death  /hl test")
+        print("  /hl guildkills on  /hl guildkills off")
     end
 end
 
