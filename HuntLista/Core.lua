@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.3.2"
+HL.version = "1.3.3"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -24,128 +24,94 @@ local defaults = {
     guildKillAlerts = true,
 }
 
--- Presety: najpierw pliki Classic/Forever, potem SOUNDKIT, potem id numeryczne
+-- Na Forever PlaySoundFile czesto nie rzuca bledu przy braku pliku,
+-- wiec najpierw gramy po klasycznych ID (PlaySound).
 HL.SoundPresets = {
     raid = {
         label = "Raid Warning",
-        files = {
-            "Sound\\Interface\\RaidWarning.ogg",
-            "Sound\\Interface\\RaidWarning.mp3",
-        },
         ids = { 8959 },
-        kit = "RAID_WARNING",
+        files = { "Sound\\Interface\\RaidWarning.ogg" },
     },
     alarm = {
         label = "Alarm",
+        ids = { 12889, 12867, 8475 },
         files = {
             "Sound\\Interface\\AlarmClockWarning3.ogg",
-            "Sound\\Interface\\AlarmClockWarning2.ogg",
-            "Sound\\Interface\\AlarmClockWarning1.ogg",
             "Sound\\Interface\\igQuestFailed.ogg",
         },
-        ids = { 12889, 12867 },
     },
     bell = {
         label = "Bell",
+        ids = { 6594, 6595, 6660 },
         files = {
             "Sound\\Doodad\\BellTollHorde.ogg",
             "Sound\\Doodad\\BellTollAlliance.ogg",
-            "Sound\\Doodad\\BellTollNightElf.ogg",
-            "Sound\\Interface\\AuctionWindowOpen.ogg",
         },
-        ids = { 6594, 6595 },
     },
     tell = {
         label = "Whisper",
+        ids = { 3081, 3093, 876 },
         files = {
             "Sound\\Interface\\iTellMessage.ogg",
-            "Sound\\Interface\\TellMessage.ogg",
             "Sound\\Interface\\FriendJoin.ogg",
         },
-        ids = { 3081, 3093 },
     },
     map = {
         label = "Map Ping",
+        ids = { 3175, 1115 },
         files = {
             "Sound\\Interface\\MapPing.ogg",
             "Sound\\Interface\\MagicClick.ogg",
-            "Sound\\Interface\\iUiInterfaceButtonA.ogg",
         },
-        ids = { 3175 },
     },
     level = {
         label = "Level Up",
+        ids = { 888, 5274 },
         files = {
             "Sound\\Spells\\LevelUp.ogg",
-            "Sound\\Interface\\LevelUp.ogg",
             "Sound\\Interface\\igQuestListComplete.ogg",
         },
-        ids = { 888, 5274 },
     },
     aggro = {
         label = "Quest / Fanfare",
+        ids = { 878, 880 },
         files = {
             "Sound\\Interface\\iQuestComplete.ogg",
             "Sound\\Interface\\igQuestListComplete.ogg",
-            "Sound\\Interface\\iQuestUpdate.ogg",
         },
-        ids = { 878 },
-        kit = "UI_AUTO_QUEST_COMPLETE",
     },
     pvp = {
         label = "PVP Flag",
+        ids = { 8174, 8192 },
         files = {
             "Sound\\Interface\\PVPFlagTakenHorde.ogg",
             "Sound\\Interface\\PVPFlagTakenAlliance.ogg",
-            "Sound\\Interface\\PVPFlagTaken.ogg",
-            "Sound\\Spells\\PVPFlagTaken.ogg",
         },
-        ids = { 8174 },
     },
 }
-
-local function TryPlayFile(path)
-    if not path or not PlaySoundFile then return false end
-    local ok = pcall(PlaySoundFile, path, "Master")
-    return ok
-end
-
-local function TryPlayId(id)
-    if not id or not PlaySound then return false end
-    local ok = pcall(PlaySound, id, "Master")
-    return ok
-end
 
 function HL:PlayHuntSound()
     if not HuntListaDB or HuntListaDB.sound == false then return end
     local key = HuntListaDB.soundPreset or "raid"
     local preset = HL.SoundPresets[key] or HL.SoundPresets.raid
 
-    if preset.files then
-        for _, path in ipairs(preset.files) do
-            if TryPlayFile(path) then return end
-        end
-    end
-    if preset.file and TryPlayFile(preset.file) then return end
-
-    if preset.kit and SOUNDKIT and SOUNDKIT[preset.kit] and PlaySound then
-        if pcall(PlaySound, SOUNDKIT[preset.kit], "Master") then return end
-    end
-
-    if preset.ids then
+    -- 1) numeryczne ID (najpewniejsze na Classic / Forever)
+    if preset.ids and PlaySound then
         for _, id in ipairs(preset.ids) do
-            if TryPlayId(id) then return end
+            local ok = pcall(PlaySound, id, "Master")
+            if ok then return end
+        end
+        for _, id in ipairs(preset.ids) do
+            local ok = pcall(PlaySound, id)
+            if ok then return end
         end
     end
 
-    if not TryPlayFile("Sound\\Interface\\RaidWarning.ogg") then
-        pcall(function()
-            if SOUNDKIT and SOUNDKIT.RAID_WARNING then
-                PlaySound(SOUNDKIT.RAID_WARNING, "Master")
-            else
-                PlaySound(8959, "Master")
-            end
-        end)
+    -- 2) pliki
+    if preset.files and PlaySoundFile then
+        for _, path in ipairs(preset.files) do
+            pcall(PlaySoundFile, path, "Master")
+        end
     end
 end
 
