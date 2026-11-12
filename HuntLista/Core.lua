@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.3.1"
+HL.version = "1.3.2"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -24,35 +24,126 @@ local defaults = {
     guildKillAlerts = true,
 }
 
--- Presety dzwiekow (Classic / Forever - SOUNDKIT lub plik)
+-- Presety: najpierw pliki Classic/Forever, potem SOUNDKIT, potem id numeryczne
 HL.SoundPresets = {
-    raid  = { label = "Raid Warning",   kit = "RAID_WARNING", file = "Sound\\Interface\\RaidWarning.ogg" },
-    alarm = { label = "Alarm",          kit = "AlarmClockWarning2", file = "Sound\\Interface\\AlarmClockWarning2.ogg" },
-    bell  = { label = "Bell",           kit = "AuctionWindowOpen", file = "Sound\\Interface\\AuctionWindowOpen.ogg" },
-    tell  = { label = "Whisper",        kit = "TellMessage", file = "Sound\\Interface\\iTellMessage.ogg" },
-    map   = { label = "Map Ping",       kit = "MapPing", file = "Sound\\Interface\\MapPing.ogg" },
-    level = { label = "Level Up",       kit = "LEVELUPSOUND", file = "Sound\\Interface\\LevelUp.ogg" },
-    aggro = { label = "Aggro / Quest",  kit = "UI_AUTO_QUEST_COMPLETE", file = "Sound\\Interface\\iQuestComplete.ogg" },
-    pvp   = { label = "PVP Flag",       kit = "PVPTHROUGHQUEUE", file = "Sound\\Interface\\PVPFlagTakenHorde.ogg" },
+    raid = {
+        label = "Raid Warning",
+        files = {
+            "Sound\\Interface\\RaidWarning.ogg",
+            "Sound\\Interface\\RaidWarning.mp3",
+        },
+        ids = { 8959 },
+        kit = "RAID_WARNING",
+    },
+    alarm = {
+        label = "Alarm",
+        files = {
+            "Sound\\Interface\\AlarmClockWarning3.ogg",
+            "Sound\\Interface\\AlarmClockWarning2.ogg",
+            "Sound\\Interface\\AlarmClockWarning1.ogg",
+            "Sound\\Interface\\igQuestFailed.ogg",
+        },
+        ids = { 12889, 12867 },
+    },
+    bell = {
+        label = "Bell",
+        files = {
+            "Sound\\Doodad\\BellTollHorde.ogg",
+            "Sound\\Doodad\\BellTollAlliance.ogg",
+            "Sound\\Doodad\\BellTollNightElf.ogg",
+            "Sound\\Interface\\AuctionWindowOpen.ogg",
+        },
+        ids = { 6594, 6595 },
+    },
+    tell = {
+        label = "Whisper",
+        files = {
+            "Sound\\Interface\\iTellMessage.ogg",
+            "Sound\\Interface\\TellMessage.ogg",
+            "Sound\\Interface\\FriendJoin.ogg",
+        },
+        ids = { 3081, 3093 },
+    },
+    map = {
+        label = "Map Ping",
+        files = {
+            "Sound\\Interface\\MapPing.ogg",
+            "Sound\\Interface\\MagicClick.ogg",
+            "Sound\\Interface\\iUiInterfaceButtonA.ogg",
+        },
+        ids = { 3175 },
+    },
+    level = {
+        label = "Level Up",
+        files = {
+            "Sound\\Spells\\LevelUp.ogg",
+            "Sound\\Interface\\LevelUp.ogg",
+            "Sound\\Interface\\igQuestListComplete.ogg",
+        },
+        ids = { 888, 5274 },
+    },
+    aggro = {
+        label = "Quest / Fanfare",
+        files = {
+            "Sound\\Interface\\iQuestComplete.ogg",
+            "Sound\\Interface\\igQuestListComplete.ogg",
+            "Sound\\Interface\\iQuestUpdate.ogg",
+        },
+        ids = { 878 },
+        kit = "UI_AUTO_QUEST_COMPLETE",
+    },
+    pvp = {
+        label = "PVP Flag",
+        files = {
+            "Sound\\Interface\\PVPFlagTakenHorde.ogg",
+            "Sound\\Interface\\PVPFlagTakenAlliance.ogg",
+            "Sound\\Interface\\PVPFlagTaken.ogg",
+            "Sound\\Spells\\PVPFlagTaken.ogg",
+        },
+        ids = { 8174 },
+    },
 }
+
+local function TryPlayFile(path)
+    if not path or not PlaySoundFile then return false end
+    local ok = pcall(PlaySoundFile, path, "Master")
+    return ok
+end
+
+local function TryPlayId(id)
+    if not id or not PlaySound then return false end
+    local ok = pcall(PlaySound, id, "Master")
+    return ok
+end
 
 function HL:PlayHuntSound()
     if not HuntListaDB or HuntListaDB.sound == false then return end
     local key = HuntListaDB.soundPreset or "raid"
     local preset = HL.SoundPresets[key] or HL.SoundPresets.raid
-    local played = false
-    pcall(function()
-        if preset.kit and SOUNDKIT and SOUNDKIT[preset.kit] and PlaySound then
-            PlaySound(SOUNDKIT[preset.kit], "Master")
-            played = true
+
+    if preset.files then
+        for _, path in ipairs(preset.files) do
+            if TryPlayFile(path) then return end
         end
-    end)
-    if not played then
+    end
+    if preset.file and TryPlayFile(preset.file) then return end
+
+    if preset.kit and SOUNDKIT and SOUNDKIT[preset.kit] and PlaySound then
+        if pcall(PlaySound, SOUNDKIT[preset.kit], "Master") then return end
+    end
+
+    if preset.ids then
+        for _, id in ipairs(preset.ids) do
+            if TryPlayId(id) then return end
+        end
+    end
+
+    if not TryPlayFile("Sound\\Interface\\RaidWarning.ogg") then
         pcall(function()
-            if preset.file and PlaySoundFile then
-                PlaySoundFile(preset.file, "Master")
-            elseif PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then
+            if SOUNDKIT and SOUNDKIT.RAID_WARNING then
                 PlaySound(SOUNDKIT.RAID_WARNING, "Master")
+            else
+                PlaySound(8959, "Master")
             end
         end)
     end
