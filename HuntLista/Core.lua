@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.1.7"
+HL.version = "1.2.0"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -27,6 +27,7 @@ local function InitDB()
     for k, v in pairs(defaults) do
         if HuntListaDB[k] == nil then HuntListaDB[k] = v end
     end
+    if not HuntListaDB.kills then HuntListaDB.kills = {} end
 end
 
 local function RebuildLookup()
@@ -109,6 +110,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "PLAYER_TARGET_CHANGED" then
         SafeCacheUnit("target")
+        if HL.OnTargetChangedDeath then pcall(function() HL:OnTargetChangedDeath() end) end
         if HuntListaDB and HuntListaDB.alertOnTarget then HL:CheckUnit("target") end
 
     elseif event == "UPDATE_MOUSEOVER_UNIT" then
@@ -139,9 +141,21 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Wersja addona: " .. HL.version)
         print("  Wersja danych: " .. HL.dataVersion)
         print("  Graczy: " .. HL:GetPlayerCount())
+        print("  Zabojstwa (Twoje): " .. (HL.GetTotalKills and HL:GetTotalKills() or 0))
         print("  Death module: " .. (HL.ShowKillerPopup and "OK" or "BRAK"))
         print("  Death popup: " .. ((HuntListaDB.deathPopup ~= false) and "ON" or "OFF"))
         print("  Debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
+    elseif msg == "kills" or msg == "zabojstwa" then
+        if HL.PrintKills then HL:PrintKills() else print("Brak modulu Kills.lua") end
+    elseif msg:match("^killreset") or msg:match("^resetkills") then
+        local who = msg:match("^killreset%s+(.+)$") or msg:match("^resetkills%s+(.+)$")
+        if HL.ResetKills then HL:ResetKills(who) end
+    elseif msg:match("^kill%s+") then
+        -- reczne dodanie zabojstwa (test / poprawka)
+        local who = msg:match("^kill%s+(.+)$")
+        if who and HL.RecordKill then
+            HL:RecordKill(who, "manual")
+        end
     elseif msg == "reload" or msg == "odswiez" then
         RebuildLookup()
         print("|cff00ff00Hunt Lista|r odswiezone. Graczy: " .. HL:GetPlayerCount())
@@ -185,7 +199,8 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         HuntListaDB.debug = not HuntListaDB.debug
         print("debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     else
-        print("|cff00ff00Hunt Lista|r: /hl  /hl status  /hl killer  /hl death  /hl test  /hl debug")
+        print("|cff00ff00Hunt Lista|r: /hl  /hl kills  /hl kill Nick  /hl killreset")
+        print("  /hl status  /hl killer  /hl death  /hl test  /hl debug")
     end
 end
 

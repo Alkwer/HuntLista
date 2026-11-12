@@ -1,0 +1,226 @@
+-- ============================================================
+-- Hunt Lista - Licznik zabojstw (lokalny, SavedVariables)
+-- Ile RAZY TY zabiles kogos z listy.
+-- Wykrywanie: chat + smierc targetu (bez CLEU - Forever).
+-- ============================================================
+
+HuntLista = HuntLista or {}
+local HL = HuntLista
+
+local lastTargetName
+local lastTargetOnList = false
+local lastTargetWasAlive = false
+local recentKillLock = {}
+
+local function EnsureKillsDB()
+    if not HuntListaDB then HuntListaDB = {} end
+    if not HuntListaDB.kills then HuntListaDB.kills = {} end
+end
+
+local function KillKey(name)
+    if not name then return nil end
+    name = strlower(strtrim(name))
+    local fw = name:match("^(%S+)") or name
+    -- klucze po pelnej nazwie z listy jesli jest
+    if HL.GetInfo then
+        local info = HL:GetInfo(name)
+        if info and info.name then
+            return strlower(strtrim(info.name))
+        end
+    end
+    return name
+end
+
+function HL:GetKillCount(name)
+    EnsureKillsDB()
+    local key = KillKey(name)
+    if not key then return 0 end
+    local e = HuntListaDB.kills[key]
+    if e then return e.count or 0 end
+    -- sprobuj pierwsze slowo
+    local fw = key:match("^(%S+)")
+    if fw and fw ~= key then
+        for k, v in pairs(HuntListaDB.kills) do
+            if k == fw or k:sub(1, #fw + 1) == fw .. " " then
+                return v.count or 0
+            end
+        end
+    end
+    return 0
+end
+
+function HL:GetTotalKills()
+    EnsureKillsDB()
+    local n = 0
+    for _, v in pairs(HuntListaDB.kills) do
+        n = n + (v.count or 0)
+    end
+    return n
+end
+
+function HL:RecordKill(name, source)
+    if not name or name == "" then return false end
+    if type(name) ~= "string" then return false end
+
+    -- tylko osoby z hunt listy
+    local info = HL.GetInfo and HL:GetInfo(name)
+    if not info then
+        if HuntListaDB and HuntListaDB.debug then
+            print("|cff888888[HL kills]|r nie na liscie: " .. tostring(name))
+        end
+        return false
+    end
+
+    local display = info.name or name
+    local key = strlower(strtrim(display))
+
+    -- anty-spam (ten sam nick 3s)
+    local now = GetTime()
+    if recentKillLock[key] and (now - recentKillLock[key]) < 3 then
+        return false
+    end
+    recentKillLock[key] = now
+
+    EnsureKillsDB()
+    local e = HuntListaDB.kills[key]
+    if not e then
+        e = { count = 0, lastAt = 0, name = display }
+        HuntListaDB.kills[key] = e
+    end
+    e.count = (e.count or 0) + 1
+    e.lastAt = time and time() or 0
+    e.name = display
+
+    print("|cff00ff00Hunt Lista|r Zabojstwo: |cffff6666" .. display .. "|r (x" .. e.count .. ")")
+    if HuntListaDB.debug then
+        print("|cff888888[HL kills]|r source=" .. tostring(source))
+    end
+
+    if HL.RefreshList and HuntListaFrame and HuntListaFrame:IsShown() then
+        HL:RefreshList()
+    end
+    return true
+end
+
+function HL:ResetKills(name)
+    EnsureKillsDB()
+    if not name or name == "" then
+        wipe(HuntListaDB.kills)
+        print("|cff00ff00Hunt Lista|r licznik zabojstw wyzerowany")
+        return
+    end
+    local key = KillKey(name)
+    if key and HuntListaDB.kills[key] then
+        HuntListaDB.kills[key] = nil
+        print("|cff00ff00Hunt Lista|r wyzerowano: " .. name)
+    else
+        print("|cff00ff00Hunt Lista|r brak wpisu: " .. tostring(name))
+    end
+end
+
+function HL:PrintKills()
+    EnsureKillsDB()
+    local rows = {}
+    for k, v in pairs(HuntListaDB.kills) do
+        table.insert(rows, { name = v.name or k, count = v.count or 0 })
+    end
+    table.sort(rows, function(a, b)
+        if a.count == b.count then return a.name < b.name end
+        return a.count > b.count
+    end)
+    print("|cff00ff00Hunt Lista|r Twoje zabojstwa (osoby z listy):")
+    if #rows == 0 then
+        print("  (brak)")
+        return
+    end
+    for _, r in ipairs(rows) do
+        print("  |cffff6666" .. r.name .. "|r  x" .. r.count)
+    end
+    print("  Razem: " .. HL:GetTotalKills())
+end
+
+-- Chat: You have slain X / PL
+local function TryParseKillChat(msg)
+    if type(msg) ~= "string" then return end
+    local patterns = {
+        "[Yy]ou have slain (.+)%.?$",
+        "[Yy]ou slain (.+)%.?$",
+        "[Ss]lain (.+)%.?$",
+        "Zabit[eya]?e[sś]? (.+)%.?$",
+        "Zabijasz (.+)%.?$",
+        "[Yy]ou have killed (.+)%.?$",
+        "[Kk]illed (.+)%.?$",
+    }
+    for _, pat in ipairs(patterns) do
+        local m = msg:match(pat)
+        if m then
+            m = strtrim(m)
+            m = m:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+            m = m:gsub("|H.-|h", ""):gsub("|h", "")
+            m = m:gsub("[%.%!]+$", "")
+            if m ~= "" then
+                HL:RecordKill(m, "chat")
+                return
+            end
+        end
+    end
+end
+
+if ChatFrame_AddMessageEventFilter then
+    local function filter(_, _, msg)
+        TryParseKillChat(msg)
+        return false
+    end
+    pcall(function()
+        ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", filter)
+        ChatFrame_AddMessageEventFilter("CHAT_MSG_COMBAT_HOSTILE_DEATH", filter)
+        ChatFrame_AddMessageEventFilter("CHAT_MSG_COMBAT_MISC_INFO", filter)
+        ChatFrame_AddMessageEventFilter("CHAT_MSG_COMBAT_XP_GAIN", filter)
+    end)
+end
+
+-- Poll: target z listy umarl gdy bylismy w walce
+local poll = CreateFrame("Frame")
+poll:SetScript("OnUpdate", function(self, elapsed)
+    self.t = (self.t or 0) + elapsed
+    if self.t < 0.2 then return end
+    self.t = 0
+
+    if not UnitExists("target") or not UnitIsPlayer("target") then
+        lastTargetName = nil
+        lastTargetOnList = false
+        lastTargetWasAlive = false
+        return
+    end
+
+    local n = UnitName("target")
+    if type(n) ~= "string" then return end
+
+    local full = (HL.ResolveFullName and HL:ResolveFullName(n)) or n
+    local onList = HL.IsOnList and HL:IsOnList(full) or false
+    local alive = not UnitIsDeadOrGhost("target")
+
+    -- target sie zmienil
+    if lastTargetName ~= full then
+        lastTargetName = full
+        lastTargetOnList = onList
+        lastTargetWasAlive = alive
+        return
+    end
+
+    -- ten sam target: byl zywy i na liscie, teraz martwy, my w combacie
+    if lastTargetOnList and lastTargetWasAlive and not alive then
+        if UnitAffectingCombat("player") or true then
+            HL:RecordKill(full, "target-death")
+        end
+    end
+
+    lastTargetOnList = onList
+    lastTargetWasAlive = alive
+end)
+
+HuntLista.GetKillCount = HL.GetKillCount
+HuntLista.GetTotalKills = HL.GetTotalKills
+HuntLista.RecordKill = HL.RecordKill
+HuntLista.ResetKills = HL.ResetKills
+HuntLista.PrintKills = HL.PrintKills
