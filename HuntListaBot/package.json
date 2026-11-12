@@ -4,11 +4,16 @@
   "description": "Discord bot do zarządzania Hunt Lista + push na GitHub",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node bot.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "discord.js": "^14.16.3",
     "octokit": "^4.0.2",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "luaparse": "0.3.1"
+  },
+  "devDependencies": {
+    "fengari": "0.1.4"
   }
 }

@@ -11,6 +11,8 @@ local lastAttackerTime = 0
 local deathFrame
 local popupShownForDeath = false
 local wasDead = false
+local deathObservedAt = 0
+local KILLER_MESSAGE_MAX_AGE = 5
 
 HL.NameCache = HL.NameCache or {}
 
@@ -162,9 +164,7 @@ local function RememberAttacker(name, reason)
     name = CleanPlayerName(name)
     if not name then return end
 
-    local full = HL:ResolveFullName(name)
-    if full then name = full end
-
+    -- Wiadomosc o smierci jest zrodlem nazwy; cache pierwszego slowa moze wskazywac inna osobe.
     lastAttackerName = name
     lastAttackerTime = GetTime()
     HL:CacheFullName(name)
@@ -175,35 +175,24 @@ local function RememberAttacker(name, reason)
 end
 
 -- Chat: "You were slain by Name" / PL warianty - bez RegisterEvent
-local CHAT_PATTERNS = {
-    "slain by (.+)$",
-    "killed by (.+)$",
-    "zabit[ya]? przez (.+)$",
-    "zabil[a]? ci[eę] (.+)$",
-    "zostaje[sz]? zabit[ya]? przez (.+)$",
-    "dies from (.+) impairments",
-    "defeated by (.+)$",
-}
-
 local function TryParseKillerFromChat(msg)
     if type(msg) ~= "string" then return end
-    local lower = strlower(msg)
-    for _, pat in ipairs(CHAT_PATTERNS) do
-        local m = lower:match(pat)
-        if m then
-            -- wez oryginalna kapitalizacje z msg
-            local startPos, endPos = lower:find(pat)
-            -- prostsze: Clean z match na oryginale case-insensitive
-            local original = msg:match("(?i)" .. pat) -- Lua nie ma (?i)
-            break
-        end
-    end
+    -- Tylko komunikaty dotyczace nas, nie np. "Someone was slain by ...".
     for _, pat in ipairs({
-        "[Ss]lain by (.+)$",
-        "[Kk]illed by (.+)$",
-        "[Zz]abit[ya]? przez (.+)$",
-        "[Zz]abil[a]? ci[eę] (.+)$",
-        "[Dd]efeated by (.+)$",
+        "^[Yy]ou were slain by (.+)$",
+        "^[Yy]ou were killed by (.+)$",
+        "^[Yy]ou have been slain by (.+)$",
+        "^[Yy]ou have been killed by (.+)$",
+        "^[Yy]ou were defeated by (.+)$",
+        "^[Ss]lain by (.+)$",
+        "^[Kk]illed by (.+)$",
+        "^[Dd]efeated by (.+)$",
+        "^[Zz]abity przez (.+)$",
+        "^[Zz]abita przez (.+)$",
+        "^[Zz]abil cie (.+)$",
+        "^[Zz]abila cie (.+)$",
+        "^[Zz]abił cię (.+)$",
+        "^[Zz]abiła cię (.+)$",
     }) do
         local m = msg:match(pat)
         if m then
@@ -326,12 +315,12 @@ local function CreateDeathFrame()
     return f
 end
 
-function HL:ShowKillerPopup(name)
+function HL:ShowKillerPopup(name, confirmed)
     if HuntListaDB and HuntListaDB.deathPopup == false then return end
     if not name or name == "" then return end
 
     SeedCacheFromData()
-    name = HL:ResolveFullName(name) or name
+    if not confirmed then name = HL:ResolveFullName(name) or name end
     name = CleanPlayerName(name)
     if not name then return end
 
@@ -367,14 +356,7 @@ local function TryShowOnDeath(source)
 
     local name = lastAttackerName
     local age = lastAttackerName and (GetTime() - lastAttackerTime) or 999
-
-    if UnitExists("target") and UnitIsPlayer("target") then
-        local best = BestUnitName("target")
-        if best and (not name or age > 45 or #best > #name) then
-            name = best
-            age = 0
-        end
-    end
+    if not name or age > KILLER_MESSAGE_MAX_AGE then return end
 
     if HuntListaDB and HuntListaDB.debug then
         print("|cff888888[HL death]|r TryShow source=" .. tostring(source)
@@ -382,21 +364,8 @@ local function TryShowOnDeath(source)
             .. " age=" .. string.format("%.1f", age))
     end
 
-    if name and age <= 45 then
-        popupShownForDeath = true
-        HL:ShowKillerPopup(name)
-    elseif HuntListaDB and HuntListaDB.debug then
-        print("|cff888888[HL death]|r brak zabojcy do pokazania")
-    end
-end
-
-function HL:OnTargetChangedDeath()
-    if UnitExists("target") and UnitIsPlayer("target") then
-        if UnitCanAttack("player", "target") or (HuntListaDB and HuntListaDB.testMode) then
-            local n = BestUnitName("target")
-            if n then RememberAttacker(n, "target") end
-        end
-    end
+    popupShownForDeath = true
+    HL:ShowKillerPopup(name, true)
 end
 
 local poll = CreateFrame("Frame")
@@ -405,23 +374,22 @@ poll:SetScript("OnUpdate", function(self, elapsed)
     if self.t < 0.15 then return end
     self.t = 0
 
-    if UnitAffectingCombat("player") then
-        if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") then
-            local n = BestUnitName("target")
-            if n then RememberAttacker(n, "combat-target") end
-        end
-    end
-
     local dead = UnitIsDeadOrGhost("player")
-    if dead and not wasDead then
-        wasDead = true
-        -- male opoznienie - chat ze slain by moze dojsc ułamek po smierci
-        C_Timer.After(0.3, function()
+    if dead then
+        if not wasDead then
+            wasDead = true
+            deathObservedAt = GetTime()
+        end
+        -- Czekamy rowniez na komunikaty, ktore przyjda pozniej niz pierwszy poll po smierci.
+        if GetTime() - deathObservedAt >= 0.3 then
             TryShowOnDeath("HEALTH")
-        end)
+        end
     elseif not dead and wasDead then
         wasDead = false
         popupShownForDeath = false
+        lastAttackerName = nil
+        lastAttackerTime = 0
+        HL:HideKillerPopup()
     end
 end)
 
@@ -435,5 +403,4 @@ HuntLista.HideKillerPopup = HL.HideKillerPopup
 HuntLista.CacheUnit = HL.CacheUnit
 HuntLista.CacheFullName = HL.CacheFullName
 HuntLista.ResolveFullName = HL.ResolveFullName
-HuntLista.OnTargetChangedDeath = HL.OnTargetChangedDeath
 HuntLista.InitDeathModule = HL.InitDeathModule

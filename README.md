@@ -3,7 +3,7 @@
 Gildyjny addon do **WoW Forever** — wspólna lista graczy PvP do oznaczania ("hunt list").
 
 Gdy ktoś z listy pojawi się w grze, dostajesz **alert**, **dźwięk** i **czerwoną czaszkę** przy nameplate / targetcie.
-Po śmierci wyskakuje **okienko z nickiem zabójcy** do skopiowania.
+Po śmierci wyskakuje **okienko z nickiem zabójcy** do skopiowania, jeśli gra wysłała rozpoznany komunikat o Twojej śmierci. Sam target nie jest uznawany za zabójcę.
 
 Lista jest wspólna dla gildii: dodajecie ludzi przez **bota na Discordzie**, a addon ściąga aktualne dane z tego repo.
 
@@ -142,6 +142,12 @@ Folder: [`HuntListaBot/`](https://github.com/frethborn/HuntLista/tree/main/HuntL
    npm install
    npm start
    ```
+
+Bot odczytuje `Data.lua` z GitHuba przed każdą komendą. Plik w repozytorium jest źródłem danych; brak lub uszkodzenie starego `local_data.json` nie zeruje listy. Ten lokalny plik nie jest już używany. Przed aktualizacją bota zachowaj jego kopię, jeśli zawiera zmiany, których poprzednia wersja nie wysłała na GitHuba, i dodaj brakujące wpisy ponownie przez Discord.
+
+Odczyt danych nie wykonuje kodu Lua. Niepoprawny format, brak pliku lub błąd odczytu blokują zapis. Komendy zmieniające listę są wykonywane kolejno, a konflikt SHA z innym zapisem wymaga ponowienia komendy. Przy niepewnym wyniku połączenia najpierw sprawdź `/hunt list`.
+
+Testy regresji (Node.js 20+): w folderze `HuntListaBot` uruchom `npm ci` i `npm test`. Testy obejmują zapis/odczyt tekstu Lua, operacje na liście z atrapą GitHuba oraz wykrywanie zabójcy z atrapami API WoW. Nie wymagają tokenów ani połączenia z grą.
 
 ---
 
