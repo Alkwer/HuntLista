@@ -1,6 +1,6 @@
 -- ============================================================
--- Hunt Lista - Death.lua (poll mode)
--- BEZ skanowania GameTooltip:SetUnit (taint + secret numbers na Forever)
+-- Hunt Lista - Death.lua
+-- Forever: combat log "Name Melee hit You" + "[You died.]"
 -- ============================================================
 
 HuntLista = HuntLista or {}
@@ -14,7 +14,7 @@ local popupShownForDeath = false
 local wasDead = false
 local deathObservedAt = 0
 
-local CHAT_MAX_AGE = 8
+local CHAT_MAX_AGE = 12
 local TARGET_MAX_AGE = 30
 
 HL.NameCache = HL.NameCache or {}
@@ -34,6 +34,8 @@ local function CleanPlayerName(name)
         local nl = n:find(string.char(10), 1, true)
         if nl then n = n:sub(1, nl - 1) end
         n = strtrim(n)
+        -- odetnij [You died.] style brackets only if entire msg
+        n = n:gsub("^%[", ""):gsub("%]$", "")
         if #n > 0 and n:sub(1, 1) == "<" and n:sub(-1) == ">" then return nil end
         n = n:gsub(" *<[^>]*> *", " ")
         n = strtrim(n)
@@ -43,6 +45,9 @@ local function CleanPlayerName(name)
         n = strtrim(n)
         n = n:gsub("  +", " ")
         if n == "" then return nil end
+        -- odrzuc oczywiste smieci z combat loga
+        local lower = strlower(n)
+        if lower == "you" or lower == "your" or lower == "died" or lower == "melee" then return nil end
         return n
     end)
 
@@ -108,7 +113,6 @@ function HL:ResolveFullName(name)
     return name
 end
 
--- TYLKO UnitName - zero GameTooltip:SetUnit (taint HealthBar na Forever)
 local function SafeUnitName(unit)
     if not unit or not UnitExists(unit) then return nil end
     local ok, n = pcall(UnitName, unit)
@@ -131,7 +135,8 @@ local function RememberAttacker(name, reason)
     name = CleanPlayerName(name)
     if not name then return end
 
-    if reason ~= "chat" and lastAttackerSource == "chat" then
+    -- chat/combatlog ma priorytet nad targetem
+    if reason == "combat-target" and lastAttackerSource and lastAttackerSource ~= "combat-target" then
         if (GetTime() - lastAttackerTime) < CHAT_MAX_AGE then
             return
         end
@@ -150,13 +155,20 @@ local function RememberAttacker(name, reason)
     end
 end
 
+-- Forever combat log z screenshota:
+-- "Name Melee hit You 46 Physical."
+-- "Name Deadly Poison II damaged You 97 Nature."
+-- "Name Mutilate hit You 175 Physical. (77 Overkill)"
+-- "[You died.]"
 local function TryParseKillerFromChat(msg)
     if not msg or type(msg) ~= "string" then return end
     if issecretvalue and issecretvalue(msg) then return end
 
     msg = msg:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
     msg = msg:gsub("|H.-|h", ""):gsub("|h", "")
+    msg = strtrim(msg)
 
+    -- klasyczne slain by
     for _, pat in ipairs({
         "^[Yy]ou were slain by (.+)$",
         "^[Yy]ou were killed by (.+)$",
@@ -165,13 +177,8 @@ local function TryParseKillerFromChat(msg)
         "^[Yy]ou were defeated by (.+)$",
         "^[Ss]lain by (.+)$",
         "^[Kk]illed by (.+)$",
-        "^[Dd]efeated by (.+)$",
         "^[Zz]abity przez (.+)$",
         "^[Zz]abita przez (.+)$",
-        "^[Zz]ostales zabity przez (.+)$",
-        "^[Zz]ostalas zabita przez (.+)$",
-        "^[Zz]ostałeś zabity przez (.+)$",
-        "^[Zz]ostałaś zabita przez (.+)$",
         "^[Zz]abil cie (.+)$",
         "^[Zz]abila cie (.+)$",
         "^[Zz]abił cię (.+)$",
@@ -186,6 +193,65 @@ local function TryParseKillerFromChat(msg)
             end
         end
     end
+
+    -- Forever / combat log: "Something hit/damaged You ..."
+    -- Nie lap "You hit ..." (to my bijemy).
+    if not msg:match("^[Yy]ou%s") then
+        local patterns = {
+            "^(.+) Melee hit You",
+            "^(.+) hit You",
+            "^(.+) crit You",
+            "^(.+) crits You",
+            "^(.+) hits You",
+            "^(.+) damaged You",
+            "^(.+) damages You",
+            "^(.+) suffers You", -- rare
+            "^(.+) was blocked", -- skip-ish
+        }
+        for _, pat in ipairs({
+            "^(.+) Melee hit You",
+            "^(.+) hit You",
+            "^(.+) hits You",
+            "^(.+) crit You",
+            "^(.+) crits You",
+            "^(.+) damaged You",
+            "^(.+) damages You",
+            "^(.+) crushes You",
+            "^(.+) crush You",
+        }) do
+            local m = msg:match(pat)
+            if m then
+                -- "Deadly Poison II" bywa w srodku: "Name Deadly Poison II damaged You"
+                -- bierzemy caly prefix przed slowem kluczowym - bywa z ability
+                -- Spróbuj odciac znana ability na koncu prefixu: ostanie 1-3 slowa jesli look like ability
+                m = strtrim(m)
+                -- Jesli pattern to "hit You" bez Melee, m moze byc "Name Mutilate"
+                -- Zostawiamy pelne m; Clean odfiltruje smieci
+                local cleaned = CleanPlayerName(m)
+                if cleaned and #cleaned >= 2 then
+                    -- Gdy m = "Name Ability Ability", a UnitName nie ma spacji ability...
+                    -- Heurystyka: jesli 3+ slow, sprobuj pierwsze 2 (Forever full name)
+                    local words = {}
+                    for w in cleaned:gmatch("%S+") do table.insert(words, w) end
+                    local candidate = cleaned
+                    if #words >= 3 then
+                        -- typowe: Name Name Ability  OR Name Ability Ability
+                        -- Preferuj 2 pierwsze slowa (nick Forever ze spacja)
+                        candidate = words[1] .. " " .. words[2]
+                    elseif #words == 2 then
+                        -- Name Ability  LUB Name Name - nie wiemy; zostaw oba, ResolveFullName z listy pomoże
+                        candidate = cleaned
+                    end
+                    RememberAttacker(candidate, "combatlog")
+                    -- zapisz tez pelniejsze jesli krotkie
+                    if candidate ~= cleaned and #words >= 2 then
+                        RememberAttacker(words[1] .. " " .. words[2], "combatlog")
+                    end
+                    return candidate
+                end
+            end
+        end
+    end
 end
 
 if ChatFrame_AddMessageEventFilter then
@@ -193,12 +259,25 @@ if ChatFrame_AddMessageEventFilter then
         TryParseKillerFromChat(msg)
         return false
     end
-    pcall(function()
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", chatFilter)
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_COMBAT_MISC_INFO", chatFilter)
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_COMBAT_HOSTILE_DEATH", chatFilter)
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_COMBAT_XP_GAIN", chatFilter)
-    end)
+    local events = {
+        "CHAT_MSG_SYSTEM",
+        "CHAT_MSG_COMBAT_MISC_INFO",
+        "CHAT_MSG_COMBAT_HOSTILE_DEATH",
+        "CHAT_MSG_COMBAT_XP_GAIN",
+        "CHAT_MSG_COMBAT_HOSTILEPLAYER_HITS",
+        "CHAT_MSG_COMBAT_SELF_HITS",
+        "CHAT_MSG_SPELL_HOSTILEPLAYER_DAMAGE",
+        "CHAT_MSG_SPELL_PERIODIC_HOSTILEPLAYER_DAMAGE",
+        "CHAT_MSG_SPELL_SELF_DAMAGE",
+        "CHAT_MSG_COMBAT_CREATURE_VS_SELF_HITS",
+        "CHAT_MSG_SPELL_CREATURE_VS_SELF_DAMAGE",
+        "CHAT_MSG_SPELL_PERIODIC_CREATURE_DAMAGE",
+        "CHAT_MSG_COMBAT_PARTY_HITS",
+        "CHAT_MSG_COMBAT_FRIENDLYPLAYER_HITS",
+    }
+    for _, ev in ipairs(events) do
+        pcall(ChatFrame_AddMessageEventFilter, ev, chatFilter)
+    end
 end
 
 local function CreateDeathFrame()
@@ -232,13 +311,13 @@ local function CreateDeathFrame()
     sub:SetText("Kliknij w nick, Ctrl+C aby skopiowac")
 
     local eb = CreateFrame("EditBox", nil, f)
-    eb:SetSize(260, 32)
+    eb:SetSize(280, 32)
     eb:SetPoint("TOP", sub, "BOTTOM", 0, -12)
     eb:SetAutoFocus(false)
     eb:SetFontObject("GameFontHighlightLarge")
     eb:SetJustifyH("CENTER")
     eb:SetTextInsets(8, 8, 0, 0)
-    eb:SetMaxLetters(64)
+    eb:SetMaxLetters(80)
     eb:EnableKeyboard(false)
 
     local bg = eb:CreateTexture(nil, "BACKGROUND")
@@ -316,7 +395,7 @@ function HL:ShowKillerPopup(name)
     if info then
         f.onListText:SetText("|cffff6666Juz na Hunt Liscie|r")
     else
-        f.onListText:SetText("|cffaaaaaaNie ma na liscie - dopisz nazwisko i wklej na Discord|r")
+        f.onListText:SetText("|cffaaaaaaNie ma na liscie - dopisz i wklej na Discord|r")
     end
 
     print("|cffff4444[Hunt Lista]|r Zabojca: |cffffff00" .. name .. "|r")
@@ -340,7 +419,7 @@ local function TryShowOnDeath(source)
     local name = lastAttackerName
     local age = lastAttackerName and (GetTime() - lastAttackerTime) or 999
     local src = lastAttackerSource
-    local maxAge = (src == "chat") and CHAT_MAX_AGE or TARGET_MAX_AGE
+    local maxAge = (src == "combat-target") and TARGET_MAX_AGE or CHAT_MAX_AGE
 
     if (not name or age > maxAge) and UnitExists("target") and UnitIsPlayer("target") then
         local best = SafeUnitName("target")
@@ -348,6 +427,7 @@ local function TryShowOnDeath(source)
             name = best
             age = 0
             src = "target-now"
+            maxAge = TARGET_MAX_AGE
         end
     end
 
@@ -362,7 +442,7 @@ local function TryShowOnDeath(source)
         popupShownForDeath = true
         HL:ShowKillerPopup(name)
     elseif HuntListaDB and HuntListaDB.debug then
-        print("|cff888888[HL death]|r brak zabojcy (chat/target)")
+        print("|cff888888[HL death]|r brak zabojcy")
     end
 end
 
@@ -389,7 +469,7 @@ poll:SetScript("OnUpdate", function(self, elapsed)
             end
         end
         local dt = GetTime() - deathObservedAt
-        if dt >= 0.25 and dt < 6 then
+        if dt >= 0.2 and dt < 8 then
             TryShowOnDeath("HEALTH")
         end
     elseif not dead and wasDead then
@@ -400,7 +480,7 @@ end)
 
 function HL:InitDeathModule()
     SeedCacheFromData()
-    print("|cff00ff00Hunt Lista|r Death.lua OK (no tooltip scan)")
+    print("|cff00ff00Hunt Lista|r Death.lua OK (Forever combat log)")
 end
 
 HuntLista.ShowKillerPopup = HL.ShowKillerPopup
