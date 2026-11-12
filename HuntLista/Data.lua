@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-12.5",
-    lastUpdate = "2026-11-12 18:30",
+    version = "2026-11-12.6",
+    lastUpdate = "2026-11-12 19:10",
     updatedBy = "DiscordBot",
 
     players = {
@@ -247,6 +247,15 @@ HuntLista_Data = {
             reason = "",
             addedBy = "grobel",
             addedAt = "2026-11-09",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
+        ["Банальный Мудрец"] = {
+            reason = "pierdolony zjeb",
+            addedBy = "frethborn",
+            addedAt = "2026-11-12",
             note = "",
             kills = "0",
             lastKillBy = "",
