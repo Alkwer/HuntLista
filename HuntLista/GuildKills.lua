@@ -29,13 +29,15 @@ local function Prune(entries, now)
 end
 
 local function ShowKill(killer, victim)
-    local msg = "|cff00ff00[HUNT - GILDIA]|r Zabojstwo: " .. killer .. " -> |cffff6666" .. victim .. "|r"
-    RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
+    local msg = "|cff00ff00[HUNT - GILDIA]|r Zabojstwo: " .. tostring(killer) .. " -> |cffff6666" .. tostring(victim) .. "|r"
+    if RaidNotice_AddMessage and RaidWarningFrame then
+        pcall(function()
+            RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
+        end)
+    end
     print(msg)
     if HL.PlayHuntSound then
         HL:PlayHuntSound()
-    elseif HuntListaDB and HuntListaDB.sound then
-        pcall(function() PlaySound(SOUNDKIT.RAID_WARNING, "Master") end)
     end
 end
 

@@ -193,16 +193,23 @@ local function TryParseKillChat(msg)
     end
 end
 
-local chat = CreateFrame("Frame")
-chat:RegisterEvent("CHAT_MSG_SYSTEM")
-chat:RegisterEvent("CHAT_MSG_COMBAT_MISC_INFO")
-chat:RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN")
-if not C_EventUtils or not C_EventUtils.IsEventValid or C_EventUtils.IsEventValid("CHAT_MSG_COMBAT_HOSTILE_DEATH") then
-    chat:RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
+-- Filtry czatu zamiast RegisterEvent (Forever: mniej taint / ADDON_ACTION_FORBIDDEN)
+if ChatFrame_AddMessageEventFilter then
+    local function filter(_, _, msg)
+        TryParseKillChat(msg)
+        return false
+    end
+    for _, ev in ipairs({
+        "CHAT_MSG_SYSTEM",
+        "CHAT_MSG_COMBAT_MISC_INFO",
+        "CHAT_MSG_COMBAT_XP_GAIN",
+        "CHAT_MSG_COMBAT_HOSTILE_DEATH",
+        "CHAT_MSG_COMBAT_HOSTILEPLAYER_HITS",
+        "CHAT_MSG_SPELL_HOSTILEPLAYER_DAMAGE",
+    }) do
+        pcall(ChatFrame_AddMessageEventFilter, ev, filter)
+    end
 end
-chat:SetScript("OnEvent", function(_, _, msg)
-    TryParseKillChat(msg)
-end)
 
 local poll = CreateFrame("Frame")
 poll:SetScript("OnUpdate", function(self, elapsed)
@@ -217,8 +224,9 @@ poll:SetScript("OnUpdate", function(self, elapsed)
         return
     end
 
-    local n = UnitName("target")
-    if type(n) ~= "string" then return end
+    local okN, n = pcall(UnitName, "target")
+    if not okN or type(n) ~= "string" then return end
+    if issecretvalue and issecretvalue(n) then return end
 
     local full = (HL.ResolveFullName and HL:ResolveFullName(n)) or n
     local onList = HL.IsOnList and HL:IsOnList(full) or false
