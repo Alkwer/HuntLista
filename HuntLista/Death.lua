@@ -1,6 +1,6 @@
 -- ============================================================
 -- Hunt Lista - Death.lua (poll mode)
--- Okienko zabojcy: chat (preferowane) + target w walce (fallback)
+-- BEZ skanowania GameTooltip:SetUnit (taint + secret numbers na Forever)
 -- ============================================================
 
 HuntLista = HuntLista or {}
@@ -14,7 +14,6 @@ local popupShownForDeath = false
 local wasDead = false
 local deathObservedAt = 0
 
--- Chat = twardsze zrodlo; target = fallback (moze byc mylny przy focusie)
 local CHAT_MAX_AGE = 8
 local TARGET_MAX_AGE = 30
 
@@ -109,55 +108,21 @@ function HL:ResolveFullName(name)
     return name
 end
 
-local scanTip
-local function TryTooltipName(unit)
+-- TYLKO UnitName - zero GameTooltip:SetUnit (taint HealthBar na Forever)
+local function SafeUnitName(unit)
     if not unit or not UnitExists(unit) then return nil end
-    if not scanTip then
-        scanTip = CreateFrame("GameTooltip", "HuntListaScanTip", nil, "GameTooltipTemplate")
-        scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
-    end
-    local ok = pcall(function()
-        scanTip:ClearLines()
-        scanTip:SetUnit(unit)
-    end)
-    if not ok then return nil end
-
-    local ok2, text = pcall(function()
-        local fs = _G["HuntListaScanTipTextLeft1"]
-        if fs and fs.GetText then
-            local t = fs:GetText()
-            if type(t) == "string" and not (issecretvalue and issecretvalue(t)) then return t end
-        end
-        return nil
-    end)
-    if ok2 and text then
-        return CleanPlayerName(text)
-    end
-    return nil
-end
-
-local function BestUnitName(unit)
-    if not unit or not UnitExists(unit) then return nil end
-    local n = UnitName(unit)
-    if type(n) ~= "string" or (issecretvalue and issecretvalue(n)) then n = nil end
-
-    local tip = TryTooltipName(unit)
-    if tip and (not n or #tip > #n) then
-        HL:CacheFullName(tip)
-        return tip
-    end
-
-    if n then
-        local resolved = HL:ResolveFullName(n)
-        return resolved or n
-    end
-    return nil
+    local ok, n = pcall(UnitName, unit)
+    if not ok or type(n) ~= "string" then return nil end
+    if issecretvalue and issecretvalue(n) then return nil end
+    n = CleanPlayerName(n)
+    if not n then return nil end
+    return HL:ResolveFullName(n) or n
 end
 
 function HL:CacheUnit(unit)
     if not unit or not UnitExists(unit) then return end
     if not UnitIsPlayer(unit) then return end
-    local n = BestUnitName(unit)
+    local n = SafeUnitName(unit)
     if n then HL:CacheFullName(n) end
 end
 
@@ -166,17 +131,14 @@ local function RememberAttacker(name, reason)
     name = CleanPlayerName(name)
     if not name then return end
 
-    -- chat nadpisuje target; target nie nadpisuje swiezego chatu
     if reason ~= "chat" and lastAttackerSource == "chat" then
         if (GetTime() - lastAttackerTime) < CHAT_MAX_AGE then
             return
         end
     end
 
-    if reason == "chat" or reason ~= lastAttackerSource then
-        local resolved = HL:ResolveFullName(name)
-        if resolved then name = resolved end
-    end
+    local resolved = HL:ResolveFullName(name)
+    if resolved then name = resolved end
 
     lastAttackerName = name
     lastAttackerTime = GetTime()
@@ -226,7 +188,6 @@ local function TryParseKillerFromChat(msg)
     end
 end
 
--- Filtr czatu (bez RegisterEvent - bezpieczniej na Forever)
 if ChatFrame_AddMessageEventFilter then
     local function chatFilter(_, _, msg)
         TryParseKillerFromChat(msg)
@@ -381,9 +342,8 @@ local function TryShowOnDeath(source)
     local src = lastAttackerSource
     local maxAge = (src == "chat") and CHAT_MAX_AGE or TARGET_MAX_AGE
 
-    -- fallback: aktualny target gracza
     if (not name or age > maxAge) and UnitExists("target") and UnitIsPlayer("target") then
-        local best = BestUnitName("target")
+        local best = SafeUnitName("target")
         if best then
             name = best
             age = 0
@@ -406,7 +366,6 @@ local function TryShowOnDeath(source)
     end
 end
 
--- Poll: target w walce + smierc
 local poll = CreateFrame("Frame")
 poll:SetScript("OnUpdate", function(self, elapsed)
     self.t = (self.t or 0) + elapsed
@@ -415,7 +374,7 @@ poll:SetScript("OnUpdate", function(self, elapsed)
 
     if UnitAffectingCombat("player") then
         if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") then
-            local n = BestUnitName("target")
+            local n = SafeUnitName("target")
             if n then RememberAttacker(n, "combat-target") end
         end
     end
@@ -429,7 +388,6 @@ poll:SetScript("OnUpdate", function(self, elapsed)
                 print("|cff888888[HL death]|r detected death")
             end
         end
-        -- kilka prob: chat moze dojsc po smierci
         local dt = GetTime() - deathObservedAt
         if dt >= 0.25 and dt < 6 then
             TryShowOnDeath("HEALTH")
@@ -437,13 +395,12 @@ poll:SetScript("OnUpdate", function(self, elapsed)
     elseif not dead and wasDead then
         wasDead = false
         popupShownForDeath = false
-        -- nie czysc lastAttacker od razu - na wypadek szybkiego combat
     end
 end)
 
 function HL:InitDeathModule()
     SeedCacheFromData()
-    print("|cff00ff00Hunt Lista|r Death.lua OK (chat + target fallback)")
+    print("|cff00ff00Hunt Lista|r Death.lua OK (no tooltip scan)")
 end
 
 HuntLista.ShowKillerPopup = HL.ShowKillerPopup
