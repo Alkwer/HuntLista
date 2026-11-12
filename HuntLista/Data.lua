@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-12.8",
-    lastUpdate = "2026-11-12 20:11",
+    version = "2026-11-12.9",
+    lastUpdate = "2026-11-12 20:47",
     updatedBy = "DiscordBot",
 
     players = {
@@ -175,6 +175,15 @@ HuntLista_Data = {
             reason = "",
             addedBy = "emwues",
             addedAt = "2026-11-09",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
+        ["Miuras Alatriste"] = {
+            reason = "NIGGER",
+            addedBy = "frethborn",
+            addedAt = "2026-11-12",
             note = "",
             kills = "0",
             lastKillBy = "",
