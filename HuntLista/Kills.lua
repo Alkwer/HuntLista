@@ -100,6 +100,12 @@ function HL:RecordKill(name, source)
     local display = info.name or name
     local key = strlower(strtrim(display))
 
+    -- Tylko komunikat gry potwierdza zabojstwo. Korekty i obserwowane zgony sa lokalne.
+    -- Potwierdzenie moze przyjsc po pollu targetu, gdy licznik jest juz zablokowany na 3s.
+    if source == "chat" and HL.BroadcastGuildKill then
+        HL:BroadcastGuildKill(name)
+    end
+
     local now = GetTime()
     if recentKillLock[key] and (now - recentKillLock[key]) < 3 then
         return false
@@ -166,15 +172,21 @@ function HL:PrintKills()
 end
 
 local function TryParseKillChat(msg)
+    if issecretvalue and issecretvalue(msg) then return end
     if type(msg) ~= "string" then return end
+    msg = msg:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    msg = msg:gsub("|H.-|h", ""):gsub("|h", "")
     local patterns = {
-        "[Yy]ou have slain (.+)%.?$",
-        "[Yy]ou slain (.+)%.?$",
-        "[Ss]lain (.+)%.?$",
-        "Zabit[eya]?e[sś]? (.+)%.?$",
-        "Zabijasz (.+)%.?$",
-        "[Yy]ou have killed (.+)%.?$",
-        "[Kk]illed (.+)%.?$",
+        "^[Yy]ou have slain (.+)$",
+        "^[Yy]ou slain (.+)$",
+        "^[Ss]lain (.+)$",
+        "^[Zz]abiles (.+)$",
+        "^[Zz]abilas (.+)$",
+        "^[Zz]abiłeś (.+)$",
+        "^[Zz]abiłaś (.+)$",
+        "^[Zz]abijasz (.+)$",
+        "^[Yy]ou have killed (.+)$",
+        "^[Kk]illed (.+)$",
     }
     for _, pat in ipairs(patterns) do
         local m = msg:match(pat)
@@ -191,18 +203,18 @@ local function TryParseKillChat(msg)
     end
 end
 
-if ChatFrame_AddMessageEventFilter then
-    local function filter(_, _, msg)
-        TryParseKillChat(msg)
-        return false
-    end
-    pcall(function()
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", filter)
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_COMBAT_HOSTILE_DEATH", filter)
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_COMBAT_MISC_INFO", filter)
-        ChatFrame_AddMessageEventFilter("CHAT_MSG_COMBAT_XP_GAIN", filter)
-    end)
+-- Odbieraj zdarzenia raz, niezaleznie od widocznosci i liczby okien czatu.
+local chat = CreateFrame("Frame")
+chat:RegisterEvent("CHAT_MSG_SYSTEM")
+chat:RegisterEvent("CHAT_MSG_COMBAT_MISC_INFO")
+chat:RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN")
+-- Starszy event nie istnieje we wszystkich wersjach klienta.
+if not C_EventUtils or not C_EventUtils.IsEventValid or C_EventUtils.IsEventValid("CHAT_MSG_COMBAT_HOSTILE_DEATH") then
+    chat:RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
 end
+chat:SetScript("OnEvent", function(_, _, msg)
+    TryParseKillChat(msg)
+end)
 
 local poll = CreateFrame("Frame")
 poll:SetScript("OnUpdate", function(self, elapsed)

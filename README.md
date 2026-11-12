@@ -18,6 +18,7 @@ Lista jest wspólna dla gildii: dodajecie ludzi przez **bota na Discordzie**, a 
 | Alert + dźwięk | Raid warning gdy ktoś z listy jest w pobliżu / na targetcie |
 | Okno listy | `/hl` — podgląd całej listy |
 | Okienko po śmierci | Nick zabójcy do skopiowania (Ctrl+C) |
+| Powiadomienia gildii | Kto zabił gracza z listy — komunikat i dźwięk dla członków gildii z addonem |
 | Updater (ręczny) | Jednorazowe ściągnięcie `Data.lua` |
 | **Auto Updater** | Okno Windows — aktualizacja bazy co X minut |
 | Discord bot | `/hunt add` / `remove` / `list` → push na GitHub |
@@ -43,6 +44,8 @@ Core.lua
 UI.lua
 Alerts.lua
 Death.lua
+Kills.lua
+GuildKills.lua
 ```
 
 ---
@@ -63,8 +66,20 @@ Death.lua
 | `/hl check` | Debug: target / mouseover — czy jest na liście |
 | `/hl debug` | Włącza/wyłącza logi w chacie |
 | `/hl close` | Zamyka okienko zabójcy |
+| `/hl guildkills on` | Włącza wysyłanie i odbieranie powiadomień o zabójstwach |
+| `/hl guildkills off` | Wyłącza powiadomienia o zabójstwach dla tej instalacji addona |
 
 Alias: `/huntlista` działa tak samo jak `/hl`.
+
+### Powiadomienia o zabójstwach w gildii
+
+Wszyscy uczestnicy muszą mieć addon w wersji **1.3.0 lub nowszej** i być online w tej samej gildii. Powiadomienia są domyślnie włączone. Gdy gra wyśle rozpoznany komunikat o zabiciu przez Ciebie konkretnego gracza z listy (np. `You have slain Mega Enemy.`), addon wysyła informację ukrytym kanałem addonowym `GUILD`. Pozostali zobaczą komunikat „Zabójstwo: kto → kogo” i usłyszą dźwięk zgodnie ze swoim ustawieniem `sound`. Zwykły czat gildyjny pozostaje bez nowych wpisów.
+
+Wiadomości nie zwiększają lokalnych liczników odbiorców i nie są przekazywane dalej. Powtórzenia tego samego zgłoszenia są tłumione przez 3 sekundy. Odbiorca może mieć starszą listę i nadal otrzyma powiadomienie.
+
+Ręczne `/hl kill Nick` i obserwacja śmierci targetu służą wyłącznie lokalnemu licznikowi. Nie dowodzą, kto zadał zabójczy cios, więc nie są ogłaszane gildii. Ucięta, niejednoznaczna nazwa również nie jest rozsyłana. Jeżeli klient Forever nie dostarczy rozpoznanego komunikatu z pełną nazwą, powiadomienie nie powstanie. Błędy lub blokady wysyłania są pokazane lokalnie; status komunikacji jest też dostępny pod `/hl status`.
+
+Instalacja tej funkcji wymaga aktualizacji całego folderu `HuntLista`, w tym nowego `GuildKills.lua` i pliku `.toc`, oraz `/reload`. Updatery pobierające tylko `Data.lua` nie instalują nowego kodu addona.
 
 ---
 
@@ -147,7 +162,7 @@ Bot odczytuje `Data.lua` z GitHuba przed każdą komendą. Plik w repozytorium j
 
 Odczyt danych nie wykonuje kodu Lua. Niepoprawny format, brak pliku lub błąd odczytu blokują zapis. Komendy zmieniające listę są wykonywane kolejno, a konflikt SHA z innym zapisem wymaga ponowienia komendy. Przy niepewnym wyniku połączenia najpierw sprawdź `/hunt list`.
 
-Testy regresji (Node.js 20+): w folderze `HuntListaBot` uruchom `npm ci` i `npm test`. Testy obejmują zapis/odczyt tekstu Lua, operacje na liście z atrapą GitHuba oraz wykrywanie zabójcy z atrapami API WoW. Nie wymagają tokenów ani połączenia z grą.
+Testy regresji (Node.js 20+): w folderze `HuntListaBot` uruchom `npm ci` i `npm test`. Testy obejmują zapis/odczyt tekstu Lua, operacje na liście z atrapą GitHuba, wykrywanie zabójcy oraz powiadomienia między symulowanymi klientami gildii z atrapami API WoW. Nie wymagają tokenów ani połączenia z grą.
 
 ---
 

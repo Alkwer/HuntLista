@@ -2,7 +2,7 @@
 ## Title: Hunt Lista
 ## Notes: Gildyjna lista graczy PvP do polowania. Dane aktualizowane z GitHuba.
 ## Author: Gildia
-## Version: 1.2.0
+## Version: 1.3.0
 ## SavedVariables: HuntListaDB
 ## DefaultState: enabled
 
@@ -12,3 +12,4 @@ UI.lua
 Alerts.lua
 Death.lua
 Kills.lua
+GuildKills.lua

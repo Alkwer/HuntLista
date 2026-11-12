@@ -7,6 +7,7 @@ const { runLua, lua, to_luastring, to_jsstring } = require('./lua');
 const original = fs.readFileSync(path.join(__dirname, '../../HuntLista/Data.lua'), 'utf8');
 const plain = value => JSON.parse(JSON.stringify(value));
 const player = { reason: 'Powód', addedBy: 'tester', addedAt: '2026-11-12', note: '' };
+const withKillDefaults = entry => ({ kills: '0', lastKillBy: '', lastKillAt: '', ...entry });
 
 function github(content = original) {
     const fake = { content, sha: '1', writes: [], reads: 0, readError: null, writeError: null };
@@ -31,8 +32,10 @@ function github(content = original) {
 
 test('existing Data.lua round-trips all players and Unicode without executing it', () => {
     const data = parseDataLua(original);
-    assert.deepEqual(plain(parseDataLua(generateLua(data))), plain(data));
     assert.deepEqual(plain(parseDataLua('\uFEFF' + original.replace(/\n/g, '\r\n'))), plain(data));
+    const expected = plain(data);
+    for (const [name, entry] of Object.entries(expected.players)) expected.players[name] = withKillDefaults(entry);
+    assert.deepEqual(plain(parseDataLua(generateLua(data))), expected);
 });
 
 test('every Lua string field preserves payloads, control characters, Unicode and trailing backslashes', () => {
@@ -45,7 +48,8 @@ test('every Lua string field preserves payloads, control characters, Unicode and
     ];
     for (const text of payloads) {
         const data = { version: text, lastUpdate: text, updatedBy: text, players: Object.create(null) };
-        data.players[text] = { reason: text, addedBy: text, addedAt: text, note: text };
+        data.players[text] = { reason: text, addedBy: text, addedAt: text, note: text,
+            kills: '7', lastKillBy: text, lastKillAt: text };
         const generated = generateLua(data);
         assert.deepEqual(plain(parseDataLua(generated)), plain(data));
         // The updater's existing counter must still recognize exactly one player.
@@ -59,7 +63,7 @@ test('every Lua string field preserves payloads, control characters, Unicode and
             }
             lua.lua_getfield(state, -1, to_luastring('players'));
             lua.lua_getfield(state, -1, to_luastring(text));
-            for (const key of ['reason', 'addedBy', 'addedAt', 'note']) {
+            for (const key of ['reason', 'addedBy', 'addedAt', 'note', 'lastKillBy', 'lastKillAt']) {
                 lua.lua_getfield(state, -1, to_luastring(key));
                 assert.equal(to_jsstring(lua.lua_tostring(state, -1)), text);
                 lua.lua_pop(state, 1);
@@ -110,7 +114,10 @@ test('fresh store preserves the remote list when adding and removing without loc
     const before = plain(await fake.store.read());
     const result = await fake.store.update(data => { data.players['New Player'] = player; });
     assert.equal(Object.keys(result.data.players).length, Object.keys(before.players).length + 1);
-    for (const [name, entry] of Object.entries(before.players)) assert.deepEqual(plain(result.data.players[name]), entry);
+    for (const [name, entry] of Object.entries(before.players)) {
+        before.players[name] = withKillDefaults(entry);
+        assert.deepEqual(plain(result.data.players[name]), before.players[name]);
+    }
     const restarted = createDataStore(fake.client, { owner: 'test', repo: 'test', path: 'Data.lua' });
     await restarted.update(data => { delete data.players['New Player']; });
     assert.deepEqual(plain((await restarted.read()).players), before.players);
