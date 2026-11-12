@@ -4,7 +4,7 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-12.7",
+    version = "2026-11-12.8",
     lastUpdate = "2026-11-12 20:11",
     updatedBy = "DiscordBot",
 
@@ -112,6 +112,15 @@ HuntLista_Data = {
             reason = "zjeb",
             addedBy = "frethborn",
             addedAt = "2026-11-09",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
+        ["Gi Gi"] = {
+            reason = "cwele tylko 2v1 jak pulniesz mobki potrafia xdd",
+            addedBy = "emwues",
+            addedAt = "2026-11-12",
             note = "",
             kills = "0",
             lastKillBy = "",
