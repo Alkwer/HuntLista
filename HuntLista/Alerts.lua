@@ -18,51 +18,45 @@ local function CanAlert(name)
 end
 
 function HL:CheckUnit(unit)
-    if not HuntListaDB.enabled then return end
-    if not UnitExists(unit) then return end
-    if not UnitIsPlayer(unit) then
-        if HuntListaDB.debug then
-            print("|cff888888[HL debug]|r " .. tostring(unit) .. " nie jest graczem")
-        end
-        return
-    end
+    if not HuntListaDB or HuntListaDB.enabled == false then return end
+    if not unit or not UnitExists(unit) then return end
+    if not UnitIsPlayer(unit) then return end
 
     if not HuntListaDB.testMode then
-        if not UnitIsEnemy("player", unit) then
-            if HuntListaDB.debug then
-                print("|cff888888[HL debug]|r " .. tostring(UnitName(unit)) .. " nie jest wrogiem (wlacz /hl test)")
-            end
-            return
-        end
+        if not UnitIsEnemy("player", unit) then return end
     end
 
-    local name = UnitName(unit)
-    if not name then return end
+    local okN, name = pcall(UnitName, unit)
+    if not okN or type(name) ~= "string" or name == "" then return end
+    if issecretvalue and issecretvalue(name) then return end
 
     local info = HL:GetInfo(name)
-    if not info and UnitFullName then
-        local full = UnitFullName(unit)
+    if not info and HL.ResolveFullName then
+        local full = HL:ResolveFullName(name)
         if full then info = HL:GetInfo(full) end
+    end
+    if not info and UnitFullName then
+        local okF, full = pcall(UnitFullName, unit)
+        if okF and full then info = HL:GetInfo(full) end
     end
 
     if HuntListaDB.debug then
-        print("|cff888888[HL debug]|r unit=" .. unit .. " name=" .. tostring(name) .. " onList=" .. (info and ("YES:" .. info.name) or "NO") .. " test=" .. tostring(HuntListaDB.testMode))
+        print("|cff888888[HL debug]|r unit=" .. tostring(unit) .. " name=" .. tostring(name)
+            .. " onList=" .. (info and ("YES:" .. info.name) or "NO"))
     end
 
     if not info then return end
 
-    if CanAlert(name) then
-        local reason = info.reason ~= "" and (" - " .. info.reason) or ""
+    if CanAlert(strlower(name)) then
+        local reason = (info.reason and info.reason ~= "") and (" - " .. info.reason) or ""
         local msg = "|cffff0000[HUNT]|r |cffffff00" .. info.name .. "|r" .. reason
-
-        RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
-        print(msg)
-
-        if HL.PlayHuntSound then
-            HL:PlayHuntSound()
-        elseif HuntListaDB.sound then
-            pcall(function() PlaySound(SOUNDKIT.RAID_WARNING, "Master") end)
+        if RaidNotice_AddMessage and RaidWarningFrame then
+            pcall(function()
+                RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
+            end)
         end
+        print(msg)
+        if HL.PlayHuntSound then HL:PlayHuntSound() end
     end
 
     if HuntListaDB.showIcon then
@@ -125,7 +119,7 @@ local function OnNamePlateAdded(unit)
         uf.HuntListaIcon:Hide()
     end
 
-    if not HuntListaDB.showIcon then return end
+    if not HuntListaDB or not HuntListaDB.showIcon then return end
     if not UnitIsPlayer(unit) then return end
     if not HuntListaDB.testMode then
         if not UnitIsEnemy("player", unit) then return end
