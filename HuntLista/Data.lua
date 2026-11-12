@@ -181,7 +181,7 @@ HuntLista_Data = {
             lastKillAt = "",
         },
         ["Miuras Alatriste"] = {
-            reason = "NIGGER",
+            reason = "netanyahu",
             addedBy = "frethborn",
             addedAt = "2026-11-12",
             note = "",
