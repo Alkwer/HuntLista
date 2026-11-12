@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-12.2",
-    lastUpdate = "2026-11-12 15:43",
+    version = "2026-11-12.3",
+    lastUpdate = "2026-11-12 18:12",
     updatedBy = "DiscordBot",
 
     players = {
@@ -49,6 +49,15 @@ HuntLista_Data = {
             reason = "pedal kampi na escort quescie xddd",
             addedBy = "frethborn",
             addedAt = "2026-11-10",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
+        ["Cynea Mc"] = {
+            reason = "chuj wie o co muchodzi",
+            addedBy = "emwues",
+            addedAt = "2026-11-12",
             note = "",
             kills = "0",
             lastKillBy = "",
