@@ -1,7 +1,5 @@
 -- ============================================================
--- Hunt Lista - Licznik zabojstw (lokalny, SavedVariables)
--- Ile RAZY TY zabiles kogos z listy.
--- Wykrywanie: chat + smierc targetu (bez CLEU - Forever).
+-- Hunt Lista - Licznik zabojstw (lokalny) + alert przy killu
 -- ============================================================
 
 HuntLista = HuntLista or {}
@@ -20,8 +18,6 @@ end
 local function KillKey(name)
     if not name then return nil end
     name = strlower(strtrim(name))
-    local fw = name:match("^(%S+)") or name
-    -- klucze po pelnej nazwie z listy jesli jest
     if HL.GetInfo then
         local info = HL:GetInfo(name)
         if info and info.name then
@@ -37,7 +33,6 @@ function HL:GetKillCount(name)
     if not key then return 0 end
     local e = HuntListaDB.kills[key]
     if e then return e.count or 0 end
-    -- sprobuj pierwsze slowo
     local fw = key:match("^(%S+)")
     if fw and fw ~= key then
         for k, v in pairs(HuntListaDB.kills) do
@@ -58,11 +53,42 @@ function HL:GetTotalKills()
     return n
 end
 
+local function ShowKillAlert(display, count, reason)
+    local reasonTxt = (reason and reason ~= "") and (" - " .. reason) or ""
+    local msg = "|cff00ff00[HUNT KILL]|r |cffffff00" .. display .. "|r |cff88ff88x" .. count .. "|r" .. reasonTxt
+
+    -- duze powiadomienie na srodku (jak raid warning)
+    if RaidNotice_AddMessage and RaidWarningFrame then
+        pcall(function()
+            RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"] or { r = 1, g = 0.2, b = 0.2 })
+        end)
+    end
+
+    -- dodatkowy pasek bledow UI (dobrze widoczny)
+    if UIErrorsFrame and UIErrorsFrame.AddMessage then
+        pcall(function()
+            UIErrorsFrame:AddMessage("|cff00ff00HUNT KILL:|r " .. display .. " (x" .. count .. ")", 1, 0.85, 0.2)
+        end)
+    end
+
+    print(msg)
+    print("|cffaaaaaaZglos na Discord:|r /hunt kill " .. display)
+
+    if HuntListaDB and HuntListaDB.sound ~= false then
+        pcall(function()
+            if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then
+                PlaySound(SOUNDKIT.RAID_WARNING, "Master")
+            elseif PlaySoundFile then
+                PlaySoundFile("Sound\\Interface\\RaidWarning.ogg", "Master")
+            end
+        end)
+    end
+end
+
 function HL:RecordKill(name, source)
     if not name or name == "" then return false end
     if type(name) ~= "string" then return false end
 
-    -- tylko osoby z hunt listy
     local info = HL.GetInfo and HL:GetInfo(name)
     if not info then
         if HuntListaDB and HuntListaDB.debug then
@@ -74,7 +100,6 @@ function HL:RecordKill(name, source)
     local display = info.name or name
     local key = strlower(strtrim(display))
 
-    -- anty-spam (ten sam nick 3s)
     local now = GetTime()
     if recentKillLock[key] and (now - recentKillLock[key]) < 3 then
         return false
@@ -91,8 +116,9 @@ function HL:RecordKill(name, source)
     e.lastAt = time and time() or 0
     e.name = display
 
-    print("|cff00ff00Hunt Lista|r Zabojstwo: |cffff6666" .. display .. "|r (x" .. e.count .. ")")
-    if HuntListaDB.debug then
+    ShowKillAlert(display, e.count, info.reason)
+
+    if HuntListaDB and HuntListaDB.debug then
         print("|cff888888[HL kills]|r source=" .. tostring(source))
     end
 
@@ -139,7 +165,6 @@ function HL:PrintKills()
     print("  Razem: " .. HL:GetTotalKills())
 end
 
--- Chat: You have slain X / PL
 local function TryParseKillChat(msg)
     if type(msg) ~= "string" then return end
     local patterns = {
@@ -179,7 +204,6 @@ if ChatFrame_AddMessageEventFilter then
     end)
 end
 
--- Poll: target z listy umarl gdy bylismy w walce
 local poll = CreateFrame("Frame")
 poll:SetScript("OnUpdate", function(self, elapsed)
     self.t = (self.t or 0) + elapsed
@@ -200,7 +224,6 @@ poll:SetScript("OnUpdate", function(self, elapsed)
     local onList = HL.IsOnList and HL:IsOnList(full) or false
     local alive = not UnitIsDeadOrGhost("target")
 
-    -- target sie zmienil
     if lastTargetName ~= full then
         lastTargetName = full
         lastTargetOnList = onList
@@ -208,11 +231,8 @@ poll:SetScript("OnUpdate", function(self, elapsed)
         return
     end
 
-    -- ten sam target: byl zywy i na liscie, teraz martwy, my w combacie
     if lastTargetOnList and lastTargetWasAlive and not alive then
-        if UnitAffectingCombat("player") or true then
-            HL:RecordKill(full, "target-death")
-        end
+        HL:RecordKill(full, "target-death")
     end
 
     lastTargetOnList = onList
