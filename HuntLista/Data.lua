@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-12.3",
-    lastUpdate = "2026-11-12 18:12",
+    version = "2026-11-12.4",
+    lastUpdate = "2026-11-12 18:29",
     updatedBy = "DiscordBot",
 
     players = {
@@ -202,6 +202,15 @@ HuntLista_Data = {
             reason = "jego nie bijemy owo",
             addedBy = "riolumt",
             addedAt = "2026-11-09",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
+        ["Stable Maxxing"] = {
+            reason = "",
+            addedBy = "jacait",
+            addedAt = "2026-11-12",
             note = "",
             kills = "0",
             lastKillBy = "",
