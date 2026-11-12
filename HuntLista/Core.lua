@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.2.0"
+HL.version = "1.2.1"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -35,17 +35,22 @@ local function RebuildLookup()
     if not HuntLista_Data or not HuntLista_Data.players then return end
     for name, info in pairs(HuntLista_Data.players) do
         local key = strlower(strtrim(name))
+        local kills = tonumber(info.kills) or 0
         HuntLista_Lookup[key] = {
             name = name,
             reason = info.reason or "",
             addedBy = info.addedBy or "",
             addedAt = info.addedAt or "",
             note = info.note or "",
+            kills = kills,
+            lastKillBy = info.lastKillBy or "",
+            lastKillAt = info.lastKillAt or "",
         }
         if HL.CacheFullName then
             pcall(function() HL:CacheFullName(name) end)
         end
     end
+    HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 end
 
 function HL:NormalizeName(name)
@@ -79,6 +84,21 @@ function HL:GetPlayerCount()
     local count = 0
     for _ in pairs(HuntLista_Lookup) do count = count + 1 end
     return count
+end
+
+-- Wspolny licznik z Data.lua (gildia)
+function HL:GetSharedKillCount(name)
+    local info = HL:GetInfo(name)
+    if info and info.kills then return tonumber(info.kills) or 0 end
+    return 0
+end
+
+function HL:GetSharedTotalKills()
+    local n = 0
+    for _, info in pairs(HuntLista_Lookup) do
+        n = n + (tonumber(info.kills) or 0)
+    end
+    return n
 end
 
 local function SafeCacheUnit(unit)
@@ -141,20 +161,40 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Wersja addona: " .. HL.version)
         print("  Wersja danych: " .. HL.dataVersion)
         print("  Graczy: " .. HL:GetPlayerCount())
-        print("  Zabojstwa (Twoje): " .. (HL.GetTotalKills and HL:GetTotalKills() or 0))
-        print("  Death module: " .. (HL.ShowKillerPopup and "OK" or "BRAK"))
+        print("  Zabojstwa gildii: " .. HL:GetSharedTotalKills())
+        print("  Zabojstwa lokalne (Ty): " .. (HL.GetTotalKills and HL:GetTotalKills() or 0))
         print("  Death popup: " .. ((HuntListaDB.deathPopup ~= false) and "ON" or "OFF"))
-        print("  Debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     elseif msg == "kills" or msg == "zabojstwa" then
-        if HL.PrintKills then HL:PrintKills() else print("Brak modulu Kills.lua") end
+        print("|cff00ff00Hunt Lista|r Ranking (z Data.lua / gildia):")
+        local rows = {}
+        for _, info in pairs(HuntLista_Lookup) do
+            local k = tonumber(info.kills) or 0
+            if k > 0 then table.insert(rows, { name = info.name, kills = k, by = info.lastKillBy }) end
+        end
+        table.sort(rows, function(a, b)
+            if a.kills == b.kills then return a.name < b.name end
+            return a.kills > b.kills
+        end)
+        if #rows == 0 then
+            print("  (brak — na Discord: /hunt kill Nick)")
+        else
+            for i, r in ipairs(rows) do
+                print("  " .. i .. ". |cffff6666" .. r.name .. "|r x" .. r.kills
+                    .. (r.by and r.by ~= "" and (" (" .. r.by .. ")") or ""))
+            end
+        end
+        if HL.PrintKills then
+            print("|cffaaaaaa--- lokalnie (tylko Ta postac) ---|r")
+            HL:PrintKills()
+        end
     elseif msg:match("^killreset") or msg:match("^resetkills") then
         local who = msg:match("^killreset%s+(.+)$") or msg:match("^resetkills%s+(.+)$")
         if HL.ResetKills then HL:ResetKills(who) end
     elseif msg:match("^kill%s+") then
-        -- reczne dodanie zabojstwa (test / poprawka)
         local who = msg:match("^kill%s+(.+)$")
         if who and HL.RecordKill then
             HL:RecordKill(who, "manual")
+            print("|cffaaaaaaZglos tez na Discord: /hunt kill " .. who .. "|r")
         end
     elseif msg == "reload" or msg == "odswiez" then
         RebuildLookup()
@@ -199,9 +239,11 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         HuntListaDB.debug = not HuntListaDB.debug
         print("debug: " .. (HuntListaDB.debug and "ON" or "OFF"))
     else
-        print("|cff00ff00Hunt Lista|r: /hl  /hl kills  /hl kill Nick  /hl killreset")
-        print("  /hl status  /hl killer  /hl death  /hl test  /hl debug")
+        print("|cff00ff00Hunt Lista|r: /hl  /hl kills  /hl kill Nick")
+        print("  Discord sync: /hunt kill Nick  (potem Auto Updater)")
+        print("  /hl status  /hl killer  /hl death  /hl test")
     end
 end
 
 ns.HL = HL
+ns.RebuildLookup = RebuildLookup

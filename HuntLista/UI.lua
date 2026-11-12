@@ -53,7 +53,7 @@ local function CreateListFrame()
     local footer = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     footer:SetPoint("BOTTOM", 0, 18)
     footer:SetTextColor(0.6, 0.6, 0.6)
-    footer:SetText("xN = ile RAZY TY ich zabiles (lokalnie na tej postaci)")
+    footer:SetText("xN = zabojstwa gildii (Discord /hunt kill)  |  lokalne osobno")
     f.footer = footer
 
     listFrame = f
@@ -75,17 +75,17 @@ function HL:RefreshList()
         table.insert(players, info)
     end
     table.sort(players, function(a, b)
-        local ka = HL.GetKillCount and HL:GetKillCount(a.name) or 0
-        local kb = HL.GetKillCount and HL:GetKillCount(b.name) or 0
+        local ka = tonumber(a.kills) or 0
+        local kb = tonumber(b.kills) or 0
         if ka ~= kb then return ka > kb end
         return a.name < b.name
     end)
 
-    local totalKills = HL.GetTotalKills and HL:GetTotalKills() or 0
-    f.versionText:SetText(string.format("Dane: %s  |  %d graczy  |  zabojstwa: %d",
+    local shared = HL.GetSharedTotalKills and HL:GetSharedTotalKills() or 0
+    f.versionText:SetText(string.format("Dane: %s  |  %d graczy  |  kille gildii: %d",
         HL.dataVersion,
         #players,
-        totalKills
+        shared
     ))
 
     local y = -4
@@ -113,10 +113,14 @@ function HL:RefreshList()
             icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
             icon:SetVertexColor(1, 0.25, 0.25)
 
-            local kills = HL.GetKillCount and HL:GetKillCount(info.name) or 0
+            local sharedK = tonumber(info.kills) or 0
+            local localK = HL.GetKillCount and HL:GetKillCount(info.name) or 0
             local killTxt = ""
-            if kills > 0 then
-                killTxt = "  |cff88ff88x" .. kills .. "|r"
+            if sharedK > 0 then
+                killTxt = "  |cff88ff88x" .. sharedK .. "|r"
+            end
+            if localK > 0 and localK ~= sharedK then
+                killTxt = killTxt .. " |cff888888(" .. localK .. " Ty)|r"
             end
 
             local nameFS = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -180,8 +184,8 @@ local function CreateMinimapButton()
         GameTooltip:AddLine("Hunt Lista")
         GameTooltip:AddLine("Kliknij, aby otworzyc liste", 0.8, 0.8, 0.8)
         GameTooltip:AddLine("Graczy: " .. HL:GetPlayerCount(), 0.7, 0.7, 0.7)
-        if HL.GetTotalKills then
-            GameTooltip:AddLine("Zabojstwa: " .. HL:GetTotalKills(), 0.5, 1, 0.5)
+        if HL.GetSharedTotalKills then
+            GameTooltip:AddLine("Kille gildii: " .. HL:GetSharedTotalKills(), 0.5, 1, 0.5)
         end
         GameTooltip:Show()
     end)
