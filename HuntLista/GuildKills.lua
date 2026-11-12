@@ -1,6 +1,5 @@
 -- ============================================================
 -- Hunt Lista - Powiadomienia o zabojstwach dla gildii z addonem
--- Kanal addonowy GUILD; wiadomosci nie zmieniaja lokalnych licznikow.
 -- ============================================================
 
 local HL = HuntLista
@@ -33,7 +32,7 @@ local function ShowKill(killer, victim)
     local msg = "|cff00ff00[HUNT - GILDIA]|r Zabojstwo: " .. killer .. " -> |cffff6666" .. victim .. "|r"
     RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
     print(msg)
-    if HuntListaDB.sound then PlaySound(SOUNDKIT.RAID_WARNING, "Master") end
+    if HL.PlayHuntSound then HL:PlayHuntSound() elseif HuntListaDB.sound then pcall(function() PlaySound(SOUNDKIT.RAID_WARNING, "Master") end) end
 end
 
 local function Failure(reason)
@@ -48,7 +47,6 @@ function HL:InitGuildKills()
         return false
     end
     local ok, result = pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX)
-    -- Forever: Success=0, DuplicatePrefix=1. Starsze klienty zwracaly true.
     if not ok or (result ~= 0 and result ~= 1 and result ~= true) then
         Failure("nie udalo sie zarejestrowac kanalu")
         return false
@@ -60,7 +58,6 @@ end
 
 function HL:BroadcastGuildKill(name)
     if not Enabled() or not IsInGuild() or not ValidName(name, 128) then return false end
-    -- Nie korzystamy z dopasowania pierwszego slowa: moze oznaczac innego gracza.
     local normalized = HL.NormalizeName and HL:NormalizeName(name) or name
     local info = HuntLista_Lookup and HuntLista_Lookup[strlower(normalized)]
     if not info or not ValidName(info.name, 128) then return false end
@@ -73,7 +70,6 @@ function HL:BroadcastGuildKill(name)
 
     recentSent[key] = now
     local ok, result = pcall(C_ChatInfo.SendAddonMessage, PREFIX, "1\t" .. victim, "GUILD")
-    -- SendAddonMessageResult.Success=0; nie oglaszamy sukcesu przy blokadzie lub throttlingu.
     if not ok or (result ~= 0 and result ~= true) then
         recentSent[key] = nil
         Failure("nie wyslano wiadomosci (" .. tostring(result) .. ")")
@@ -101,11 +97,9 @@ frame:SetScript("OnEvent", function(_, event, prefix, message, channel, sender)
     Prune(recentSent, now)
     Prune(recentReceived, now)
     local victimKey = strlower(victim)
-    -- Wlasne echo (rowniez gdy API obcina nazwe naszej postaci) nie daje drugiego alertu.
     if recentSent[victimKey] then return end
     local key = strlower(sender) .. "\t" .. victimKey
     if recentReceived[key] then return end
     recentReceived[key] = now
-    -- Nadawce ustala gra, nie pole w pakiecie. Nie przekazujemy wiadomosci dalej.
     ShowKill(sender, victim)
 end)
