@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-12.1",
-    lastUpdate = "2026-11-12 13:09",
+    version = "2026-11-12.2",
+    lastUpdate = "2026-11-12 15:43",
     updatedBy = "DiscordBot",
 
     players = {
@@ -112,6 +112,15 @@ HuntLista_Data = {
             reason = "xd",
             addedBy = "frethborn",
             addedAt = "2026-11-09",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
+        ["Kubo Sneaky"] = {
+            reason = "",
+            addedBy = "grobel",
+            addedAt = "2026-11-12",
             note = "",
             kills = "0",
             lastKillBy = "",
