@@ -57,14 +57,12 @@ local function ShowKillAlert(display, count, reason)
     local reasonTxt = (reason and reason ~= "") and (" - " .. reason) or ""
     local msg = "|cff00ff00[HUNT KILL]|r |cffffff00" .. display .. "|r |cff88ff88x" .. count .. "|r" .. reasonTxt
 
-    -- duze powiadomienie na srodku (jak raid warning)
     if RaidNotice_AddMessage and RaidWarningFrame then
         pcall(function()
             RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"] or { r = 1, g = 0.2, b = 0.2 })
         end)
     end
 
-    -- dodatkowy pasek bledow UI (dobrze widoczny)
     if UIErrorsFrame and UIErrorsFrame.AddMessage then
         pcall(function()
             UIErrorsFrame:AddMessage("|cff00ff00HUNT KILL:|r " .. display .. " (x" .. count .. ")", 1, 0.85, 0.2)
@@ -74,14 +72,8 @@ local function ShowKillAlert(display, count, reason)
     print(msg)
     print("|cffaaaaaaZglos na Discord:|r /hunt kill " .. display)
 
-    if HuntListaDB and HuntListaDB.sound ~= false then
-        pcall(function()
-            if PlaySound and SOUNDKIT and SOUNDKIT.RAID_WARNING then
-                PlaySound(SOUNDKIT.RAID_WARNING, "Master")
-            elseif PlaySoundFile then
-                PlaySoundFile("Sound\\Interface\\RaidWarning.ogg", "Master")
-            end
-        end)
+    if HL.PlayHuntSound then
+        HL:PlayHuntSound()
     end
 end
 
@@ -100,17 +92,15 @@ function HL:RecordKill(name, source)
     local display = info.name or name
     local key = strlower(strtrim(display))
 
-    -- Tylko komunikat gry potwierdza zabojstwo. Korekty i obserwowane zgony sa lokalne.
-    -- Potwierdzenie moze przyjsc po pollu targetu, gdy licznik jest juz zablokowany na 3s.
-    if source == "chat" and HL.BroadcastGuildKill then
-        HL:BroadcastGuildKill(name)
-    end
-
     local now = GetTime()
     if recentKillLock[key] and (now - recentKillLock[key]) < 3 then
         return false
     end
     recentKillLock[key] = now
+
+    if source == "chat" and HL.BroadcastGuildKill then
+        HL:BroadcastGuildKill(name)
+    end
 
     EnsureKillsDB()
     local e = HuntListaDB.kills[key]
@@ -203,12 +193,10 @@ local function TryParseKillChat(msg)
     end
 end
 
--- Odbieraj zdarzenia raz, niezaleznie od widocznosci i liczby okien czatu.
 local chat = CreateFrame("Frame")
 chat:RegisterEvent("CHAT_MSG_SYSTEM")
 chat:RegisterEvent("CHAT_MSG_COMBAT_MISC_INFO")
 chat:RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN")
--- Starszy event nie istnieje we wszystkich wersjach klienta.
 if not C_EventUtils or not C_EventUtils.IsEventValid or C_EventUtils.IsEventValid("CHAT_MSG_COMBAT_HOSTILE_DEATH") then
     chat:RegisterEvent("CHAT_MSG_COMBAT_HOSTILE_DEATH")
 end
