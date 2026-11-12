@@ -32,7 +32,11 @@ local function ShowKill(killer, victim)
     local msg = "|cff00ff00[HUNT - GILDIA]|r Zabojstwo: " .. killer .. " -> |cffff6666" .. victim .. "|r"
     RaidNotice_AddMessage(RaidWarningFrame, msg, ChatTypeInfo["RAID_WARNING"])
     print(msg)
-    if HL.PlayHuntSound then HL:PlayHuntSound() elseif HuntListaDB.sound then pcall(function() PlaySound(SOUNDKIT.RAID_WARNING, "Master") end) end
+    if HL.PlayHuntSound then
+        HL:PlayHuntSound()
+    elseif HuntListaDB and HuntListaDB.sound then
+        pcall(function() PlaySound(SOUNDKIT.RAID_WARNING, "Master") end)
+    end
 end
 
 local function Failure(reason)
