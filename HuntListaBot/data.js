@@ -3,11 +3,10 @@ const { TextDecoder } = require('node:util');
 
 const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const metadata = ['version', 'lastUpdate', 'updatedBy'];
-const playerFields = ['reason', 'addedBy', 'addedAt', 'note'];
+const playerFields = ['reason', 'addedBy', 'addedAt', 'note', 'kills', 'lastKillBy', 'lastKillAt'];
 
 function luaString(value) {
     if (typeof value !== 'string') throw new Error('Oczekiwano tekstu w danych listy.');
-    // Lua 5.1: stale trzy cyfry zapobiegaja polaczeniu escape z kolejna cyfra.
     return '"' + value.replace(/["\\\x00-\x1f\x7f]/g,
         char => '\\' + char.charCodeAt(0).toString().padStart(3, '0')) + '"';
 }
@@ -45,13 +44,11 @@ function parseDataLua(content) {
     if (typeof content !== 'string' || Buffer.byteLength(content, 'utf8') > 1024 * 1024) {
         throw new Error('Niepoprawny lub zbyt duży Data.lua.');
     }
-    // Parser widzi bajty Lua; dopiero wartosci literałów dekodujemy jako UTF-8.
     const ast = luaparse.parse(Buffer.from(content.replace(/^\uFEFF/, ''), 'utf8').toString('latin1'), {
         luaVersion: '5.1', encodingMode: 'pseudo-latin1', comments: false,
     });
     function literal(node, depth = 0) {
         if (node.type === 'StringLiteral') {
-            // Lua normalizuje nowe linie w [[...]], ale nie w jawnych escape krotkich literalow.
             const bytes = node.raw.startsWith('[') ? node.value.replace(/\r\n|\n\r|\r/g, '\n') : node.value;
             return utf8.decode(Buffer.from(bytes, 'latin1'));
         }
@@ -93,12 +90,16 @@ HuntLista_Data = {
     for (const key of metadata) lua += `    ${key} = ${luaString(data[key])},\n`;
     lua += '\n    players = {\n';
     for (const name of Object.keys(data.players).sort((a, b) => a.localeCompare(b))) {
+        const p = data.players[name];
+        // domyslne pola kill
+        if (p.kills === undefined) p.kills = '0';
+        if (p.lastKillBy === undefined) p.lastKillBy = '';
+        if (p.lastKillAt === undefined) p.lastKillAt = '';
         lua += `        [${luaString(name)}] = {\n`;
-        for (const key of playerFields) lua += `            ${key} = ${luaString(data.players[name][key] ?? '')},\n`;
+        for (const key of playerFields) lua += `            ${key} = ${luaString(p[key] ?? '')},\n`;
         lua += '        },\n';
     }
     lua += '    }\n}\n\nHuntLista_Lookup = {}\n';
-    // Walidacja calego wyniku, zanim cokolwiek zostanie opublikowane.
     parseDataLua(lua);
     return lua;
 }
@@ -128,7 +129,6 @@ function createDataStore(octokit, repository) {
     return {
         async read() { return (await readSnapshot()).data; },
         update(change) {
-            // Jeden odczyt-modyfikacja-zapis naraz. SHA chroni tez przed innymi instancjami bota.
             const result = pending.then(async () => {
                 const { data, sha } = await readSnapshot();
                 if (change(data) === false) return { changed: false, data };

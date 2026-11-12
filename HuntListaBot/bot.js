@@ -1,13 +1,14 @@
 /**
  * Hunt Lista Discord Bot
- * 
+ *
  * Komendy:
  *   /hunt add <nick> [powód]
  *   /hunt remove <nick>
  *   /hunt list
  *   /hunt info <nick>
- * 
- * Po każdej zmianie bot aktualizuje plik Data.lua na GitHubie.
+ *   /hunt kill <nick> [ile]   — wspólny licznik zabójstw (+1)
+ *   /hunt kills              — ranking zabójstw
+ *   /hunt killreset <nick>   — zeruj licznik
  */
 
 require('dotenv').config();
@@ -15,7 +16,6 @@ const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuild
 const { Octokit } = require('octokit');
 const { createDataStore, validateNick } = require('./data');
 
-// ========== KONFIGURACJA ==========
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
@@ -42,6 +42,12 @@ const commands = [
         .addSubcommand(sub => sub.setName('list').setDescription('Pokaż całą listę'))
         .addSubcommand(sub => sub.setName('info').setDescription('Szczegóły gracza')
             .addStringOption(o => o.setName('nick').setDescription('Nick gracza').setRequired(true).setMaxLength(64)))
+        .addSubcommand(sub => sub.setName('kill').setDescription('Dodaj zabójstwo (wspólny licznik gildii)')
+            .addStringOption(o => o.setName('nick').setDescription('Nick z listy').setRequired(true).setMaxLength(64))
+            .addIntegerOption(o => o.setName('ile').setDescription('Ile dodać (domyślnie 1)').setRequired(false).setMinValue(1).setMaxValue(50)))
+        .addSubcommand(sub => sub.setName('kills').setDescription('Ranking zabójstw (wspólny)'))
+        .addSubcommand(sub => sub.setName('killreset').setDescription('Wyzeruj wspólny licznik gracza')
+            .addStringOption(o => o.setName('nick').setDescription('Nick z listy').setRequired(true).setMaxLength(64)))
 ].map(c => c.toJSON());
 
 async function registerCommands() {
@@ -62,7 +68,19 @@ client.once('ready', () => {
 });
 
 function findPlayer(data, nick) {
-    return Object.keys(data.players).find(key => key.toLowerCase() === nick.toLowerCase());
+    const lower = nick.toLowerCase();
+    const exact = Object.keys(data.players).find(key => key.toLowerCase() === lower);
+    if (exact) return exact;
+    // fuzzy: pierwsze słowo (Forever)
+    return Object.keys(data.players).find(key => {
+        const k = key.toLowerCase();
+        return k === lower || k.startsWith(lower + ' ');
+    });
+}
+
+function getKills(p) {
+    const n = parseInt(p && p.kills, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 client.on('interactionCreate', async interaction => {
@@ -72,7 +90,8 @@ client.on('interactionCreate', async interaction => {
     const sub = interaction.options.getSubcommand();
     const user = interaction.user.username;
     try {
-        const nick = sub === 'list' ? null : validateNick(interaction.options.getString('nick'));
+        const needsNick = sub !== 'list' && sub !== 'kills';
+        const nick = needsNick ? validateNick(interaction.options.getString('nick')) : null;
         const reason = sub === 'add' ? interaction.options.getString('powod') || '' : '';
         if (reason.length > 1024) throw new Error('Powód może mieć najwyżej 1024 znaki.');
         await interaction.deferReply();
@@ -80,7 +99,16 @@ client.on('interactionCreate', async interaction => {
         if (sub === 'add') {
             const { data } = await store.update(data => {
                 const key = findPlayer(data, nick) || nick;
-                data.players[key] = { reason, addedBy: user, addedAt: new Date().toISOString().slice(0, 10), note: '' };
+                const prev = data.players[key] || {};
+                data.players[key] = {
+                    reason,
+                    addedBy: user,
+                    addedAt: new Date().toISOString().slice(0, 10),
+                    note: prev.note || '',
+                    kills: prev.kills || '0',
+                    lastKillBy: prev.lastKillBy || '',
+                    lastKillAt: prev.lastKillAt || '',
+                };
             });
             const embed = new EmbedBuilder().setColor(0xff4444).setTitle('Dodano na Hunt Listę')
                 .addFields(
@@ -108,7 +136,9 @@ client.on('interactionCreate', async interaction => {
             if (names.length === 0) { await interaction.editReply({ content: 'Lista jest pusta.' }); return; }
             let text = names.map(n => {
                 const p = data.players[n];
-                return `• **${n}**${p.reason ? ` — ${p.reason}` : ''} _(dodał: ${p.addedBy || '—'})_`;
+                const k = getKills(p);
+                const kill = k > 0 ? ` **x${k}**` : '';
+                return `• **${n}**${kill}${p.reason ? ` — ${p.reason}` : ''} _(dodał: ${p.addedBy || '—'})_`;
             }).join('\n');
             if (text.length > 3900) text = text.slice(0, 3900) + '\n…';
             const embed = new EmbedBuilder().setColor(0xff4444).setTitle(`Hunt Lista (${names.length})`)
@@ -126,8 +156,73 @@ client.on('interactionCreate', async interaction => {
                     { name: 'Dodał', value: (p.addedBy || '—').slice(0, 1024), inline: true },
                     { name: 'Data', value: (p.addedAt || '—').slice(0, 1024), inline: true },
                     { name: 'Notatka', value: (p.note || '—').slice(0, 1024), inline: false },
+                    { name: 'Zabójstwa (gildia)', value: String(getKills(p)), inline: true },
+                    { name: 'Ostatni kill', value: p.lastKillBy ? `${p.lastKillBy} (${p.lastKillAt || '?'})` : '—', inline: true },
                 );
             await interaction.editReply({ embeds: [embed] });
+        }
+        else if (sub === 'kill') {
+            const ile = interaction.options.getInteger('ile') || 1;
+            let found;
+            let newCount = 0;
+            const { changed, data } = await store.update(data => {
+                found = findPlayer(data, nick);
+                if (!found) return false;
+                const p = data.players[found];
+                const cur = getKills(p);
+                newCount = cur + ile;
+                p.kills = String(newCount);
+                p.lastKillBy = user;
+                p.lastKillAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+                if (!p.reason) p.reason = p.reason || '';
+                if (!p.addedBy) p.addedBy = p.addedBy || '';
+                if (!p.addedAt) p.addedAt = p.addedAt || '';
+                if (!p.note) p.note = p.note || '';
+            });
+            if (!changed) {
+                await interaction.editReply({ content: `Nie ma **${nick}** na liście. Najpierw \`/hunt add\`.` });
+                return;
+            }
+            const embed = new EmbedBuilder().setColor(0x44ff88).setTitle('Zabójstwo zapisane')
+                .addFields(
+                    { name: 'Nick', value: found, inline: true },
+                    { name: 'Dodał', value: user, inline: true },
+                    { name: 'Licznik', value: `**x${newCount}** (+${ile})`, inline: true },
+                    { name: 'Wersja danych', value: data.version, inline: true },
+                ).setFooter({ text: 'GitHub OK – odpalcie Auto Updater / zaktualizujcie Data.lua' });
+            await interaction.editReply({ embeds: [embed] });
+        }
+        else if (sub === 'kills') {
+            const data = await store.read();
+            const rows = Object.keys(data.players).map(n => ({
+                name: n,
+                kills: getKills(data.players[n]),
+                lastBy: data.players[n].lastKillBy || '',
+            })).filter(r => r.kills > 0);
+            rows.sort((a, b) => b.kills - a.kills || a.name.localeCompare(b.name));
+            if (rows.length === 0) {
+                await interaction.editReply({ content: 'Brak zapisanych zabójstw. Użyj `/hunt kill <nick>`.' });
+                return;
+            }
+            let text = rows.slice(0, 40).map((r, i) =>
+                `**${i + 1}.** ${r.name} — **x${r.kills}**${r.lastBy ? ` _(ostatni: ${r.lastBy})_` : ''}`
+            ).join('\n');
+            const embed = new EmbedBuilder().setColor(0x44ff88).setTitle(`Ranking zabójstw (${rows.length})`)
+                .setDescription(text).setFooter({ text: `Wersja: ${data.version}` });
+            await interaction.editReply({ embeds: [embed] });
+        }
+        else if (sub === 'killreset') {
+            let found;
+            const { changed, data } = await store.update(data => {
+                found = findPlayer(data, nick);
+                if (!found) return false;
+                data.players[found].kills = '0';
+                data.players[found].lastKillBy = '';
+                data.players[found].lastKillAt = '';
+            });
+            await interaction.editReply({ content: changed
+                ? `Wyzerowano licznik **${found}**. Wersja: \`${data.version}\``
+                : `Nie ma **${nick}** na liście.` });
         }
     } catch (error) {
         console.error('Błąd komendy hunt:', error.message);
