@@ -1,6 +1,6 @@
 -- ============================================================
 -- Hunt Lista - Death.lua (poll mode)
--- Pelne nicki spoza listy: chat systemowy + tooltip (bez CLEU)
+-- Okienko zabojcy: chat (preferowane) + target w walce (fallback)
 -- ============================================================
 
 HuntLista = HuntLista or {}
@@ -8,17 +8,22 @@ local HL = HuntLista
 
 local lastAttackerName = nil
 local lastAttackerTime = 0
+local lastAttackerSource = nil
 local deathFrame
 local popupShownForDeath = false
 local wasDead = false
 local deathObservedAt = 0
-local KILLER_MESSAGE_MAX_AGE = 5
+
+-- Chat = twardsze zrodlo; target = fallback (moze byc mylny przy focusie)
+local CHAT_MAX_AGE = 8
+local TARGET_MAX_AGE = 30
 
 HL.NameCache = HL.NameCache or {}
 
 local function CleanPlayerName(name)
     if not name or name == "" then return nil end
     if type(name) ~= "string" then return nil end
+    if issecretvalue and issecretvalue(name) then return nil end
 
     local ok, cleaned = pcall(function()
         local n = strtrim(name)
@@ -33,7 +38,6 @@ local function CleanPlayerName(name)
         if #n > 0 and n:sub(1, 1) == "<" and n:sub(-1) == ">" then return nil end
         n = n:gsub(" *<[^>]*> *", " ")
         n = strtrim(n)
-        -- odetnij kropke / wykrzyknik na koncu z wiadomosci chatu
         n = n:gsub("[%.%!%?]+$", "")
         local before = n:match("^(.+)%-[^%- ]+$")
         if before then n = before end
@@ -62,7 +66,6 @@ function HL:CacheFullName(full)
     local fw = FirstWord(full)
     if not fw or #fw < 2 then return end
     local prev = HL.NameCache[fw]
-    -- preferuj dluzszy (ze spacja = pelny nick Forever)
     if not prev or (#full > #prev) then
         HL.NameCache[fw] = full
     end
@@ -106,7 +109,6 @@ function HL:ResolveFullName(name)
     return name
 end
 
--- Tooltip scan (czasem ma pelna nazwe gdy UnitName ucina)
 local scanTip
 local function TryTooltipName(unit)
     if not unit or not UnitExists(unit) then return nil end
@@ -124,7 +126,7 @@ local function TryTooltipName(unit)
         local fs = _G["HuntListaScanTipTextLeft1"]
         if fs and fs.GetText then
             local t = fs:GetText()
-            if type(t) == "string" then return t end
+            if type(t) == "string" and not (issecretvalue and issecretvalue(t)) then return t end
         end
         return nil
     end)
@@ -137,7 +139,7 @@ end
 local function BestUnitName(unit)
     if not unit or not UnitExists(unit) then return nil end
     local n = UnitName(unit)
-    if type(n) ~= "string" then n = nil end
+    if type(n) ~= "string" or (issecretvalue and issecretvalue(n)) then n = nil end
 
     local tip = TryTooltipName(unit)
     if tip and (not n or #tip > #n) then
@@ -164,9 +166,21 @@ local function RememberAttacker(name, reason)
     name = CleanPlayerName(name)
     if not name then return end
 
-    -- Wiadomosc o smierci jest zrodlem nazwy; cache pierwszego slowa moze wskazywac inna osobe.
+    -- chat nadpisuje target; target nie nadpisuje swiezego chatu
+    if reason ~= "chat" and lastAttackerSource == "chat" then
+        if (GetTime() - lastAttackerTime) < CHAT_MAX_AGE then
+            return
+        end
+    end
+
+    if reason == "chat" or reason ~= lastAttackerSource then
+        local resolved = HL:ResolveFullName(name)
+        if resolved then name = resolved end
+    end
+
     lastAttackerName = name
     lastAttackerTime = GetTime()
+    lastAttackerSource = reason
     HL:CacheFullName(name)
 
     if HuntListaDB and HuntListaDB.debug then
@@ -174,10 +188,13 @@ local function RememberAttacker(name, reason)
     end
 end
 
--- Chat: "You were slain by Name" / PL warianty - bez RegisterEvent
 local function TryParseKillerFromChat(msg)
-    if type(msg) ~= "string" then return end
-    -- Tylko komunikaty dotyczace nas, nie np. "Someone was slain by ...".
+    if not msg or type(msg) ~= "string" then return end
+    if issecretvalue and issecretvalue(msg) then return end
+
+    msg = msg:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    msg = msg:gsub("|H.-|h", ""):gsub("|h", "")
+
     for _, pat in ipairs({
         "^[Yy]ou were slain by (.+)$",
         "^[Yy]ou were killed by (.+)$",
@@ -189,6 +206,10 @@ local function TryParseKillerFromChat(msg)
         "^[Dd]efeated by (.+)$",
         "^[Zz]abity przez (.+)$",
         "^[Zz]abita przez (.+)$",
+        "^[Zz]ostales zabity przez (.+)$",
+        "^[Zz]ostalas zabita przez (.+)$",
+        "^[Zz]ostałeś zabity przez (.+)$",
+        "^[Zz]ostałaś zabita przez (.+)$",
         "^[Zz]abil cie (.+)$",
         "^[Zz]abila cie (.+)$",
         "^[Zz]abił cię (.+)$",
@@ -205,6 +226,7 @@ local function TryParseKillerFromChat(msg)
     end
 end
 
+-- Filtr czatu (bez RegisterEvent - bezpieczniej na Forever)
 if ChatFrame_AddMessageEventFilter then
     local function chatFilter(_, _, msg)
         TryParseKillerFromChat(msg)
@@ -315,12 +337,12 @@ local function CreateDeathFrame()
     return f
 end
 
-function HL:ShowKillerPopup(name, confirmed)
+function HL:ShowKillerPopup(name)
     if HuntListaDB and HuntListaDB.deathPopup == false then return end
     if not name or name == "" then return end
 
     SeedCacheFromData()
-    if not confirmed then name = HL:ResolveFullName(name) or name end
+    name = HL:ResolveFullName(name) or name
     name = CleanPlayerName(name)
     if not name then return end
 
@@ -356,46 +378,72 @@ local function TryShowOnDeath(source)
 
     local name = lastAttackerName
     local age = lastAttackerName and (GetTime() - lastAttackerTime) or 999
-    if not name or age > KILLER_MESSAGE_MAX_AGE then return end
+    local src = lastAttackerSource
+    local maxAge = (src == "chat") and CHAT_MAX_AGE or TARGET_MAX_AGE
+
+    -- fallback: aktualny target gracza
+    if (not name or age > maxAge) and UnitExists("target") and UnitIsPlayer("target") then
+        local best = BestUnitName("target")
+        if best then
+            name = best
+            age = 0
+            src = "target-now"
+        end
+    end
 
     if HuntListaDB and HuntListaDB.debug then
         print("|cff888888[HL death]|r TryShow source=" .. tostring(source)
             .. " last=" .. tostring(lastAttackerName)
+            .. " via=" .. tostring(src)
             .. " age=" .. string.format("%.1f", age))
     end
 
-    popupShownForDeath = true
-    HL:ShowKillerPopup(name, true)
+    if name and age <= maxAge then
+        popupShownForDeath = true
+        HL:ShowKillerPopup(name)
+    elseif HuntListaDB and HuntListaDB.debug then
+        print("|cff888888[HL death]|r brak zabojcy (chat/target)")
+    end
 end
 
+-- Poll: target w walce + smierc
 local poll = CreateFrame("Frame")
 poll:SetScript("OnUpdate", function(self, elapsed)
     self.t = (self.t or 0) + elapsed
     if self.t < 0.15 then return end
     self.t = 0
 
+    if UnitAffectingCombat("player") then
+        if UnitExists("target") and UnitIsPlayer("target") and UnitCanAttack("player", "target") then
+            local n = BestUnitName("target")
+            if n then RememberAttacker(n, "combat-target") end
+        end
+    end
+
     local dead = UnitIsDeadOrGhost("player")
     if dead then
         if not wasDead then
             wasDead = true
             deathObservedAt = GetTime()
+            if HuntListaDB and HuntListaDB.debug then
+                print("|cff888888[HL death]|r detected death")
+            end
         end
-        -- Czekamy rowniez na komunikaty, ktore przyjda pozniej niz pierwszy poll po smierci.
-        if GetTime() - deathObservedAt >= 0.3 then
+        -- kilka prob: chat moze dojsc po smierci
+        local dt = GetTime() - deathObservedAt
+        if dt >= 0.25 and dt < 6 then
             TryShowOnDeath("HEALTH")
         end
     elseif not dead and wasDead then
         wasDead = false
         popupShownForDeath = false
-        lastAttackerName = nil
-        lastAttackerTime = 0
-        HL:HideKillerPopup()
+        -- nie czysc lastAttacker od razu - na wypadek szybkiego combat
     end
 end)
 
 function HL:InitDeathModule()
     SeedCacheFromData()
-    print("|cff00ff00Hunt Lista|r Death.lua OK (poll + chat/tooltip)")
+    print("|cff00ff00Hunt Lista|r Death.lua OK (chat + target fallback)")
 end
 
 HuntLista.ShowKillerPopup = HL.ShowKillerPopup
