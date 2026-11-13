@@ -4,11 +4,20 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-12.9",
-    lastUpdate = "2026-11-12 20:47",
+    version = "2026-11-13.1",
+    lastUpdate = "2026-11-13 01:40",
     updatedBy = "DiscordBot",
 
     players = {
+        ["Akaza Soryu"] = {
+            reason = "",
+            addedBy = "wuano",
+            addedAt = "2026-11-13",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
         ["Aokingus Maximus"] = {
             reason = "",
             addedBy = "emwues",
