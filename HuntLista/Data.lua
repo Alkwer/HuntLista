@@ -4,7 +4,7 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-14.3",
+    version = "2026-11-14.4",
     lastUpdate = "2026-11-14 16:43",
     updatedBy = "DiscordBot",
 
@@ -157,6 +157,15 @@ HuntLista_Data = {
             reason = "",
             addedBy = "grobel",
             addedAt = "2026-11-12",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
+        ["Kustosz Tequila"] = {
+            reason = "tak jak powyżej",
+            addedBy = "haczkes",
+            addedAt = "2026-11-14",
             note = "",
             kills = "0",
             lastKillBy = "",
