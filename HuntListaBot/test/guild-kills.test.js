@@ -4,7 +4,7 @@ const path = require('node:path');
 const { runLua } = require('./lua');
 const { luaString } = require('../data');
 const addonPath = path.join(__dirname, '../../HuntLista');
-const sources = Object.fromEntries(['Core.lua', 'Kills.lua', 'GuildKills.lua'].map(name =>
+const sources = Object.fromEntries(['Core.lua', 'Kills.lua', 'KillDetection.lua', 'GuildKills.lua'].map(name =>
     [name, luaString(fs.readFileSync(path.join(addonPath, name), 'utf8'))]));
 
 // Separate Lua environments model clients sharing only addon messages, never SavedVariables.
@@ -14,13 +14,14 @@ world = { now = 100, clients = {}, packets = {}, pending = {} }
 function client(name, options)
     options = options or {}
     local c = { name = name, frames = {}, filters = {}, alerts = {}, logs = {}, sounds = 0,
-        inGuild = true, targetAlive = true, targetExists = false }
+        inGuild = true, targetAlive = true, targetExists = false,
+        units = { player = { guid = 'Player-1-' .. name }, pet = { guid = 'Pet-1-' .. name } } }
     local env = setmetatable({}, { __index = _G })
     env._G = env
     env.HuntListaDB = {}
     env.HuntLista_Data = { version = 'test', players = {
         ['Mega Enemy'] = {}, ['Mega Rival'] = {}, ['Bad Guy'] = {}, ['Tollwütige Fledermaus'] = {},
-        ['Case Conflict'] = {}, ['case conflict'] = {}
+        ['Case Conflict'] = {}, ['case conflict'] = {}, ['Mega Enemy-Slayer'] = {}
     }}
     env.HuntLista_Lookup = {}
     env.SlashCmdList = {}
@@ -35,7 +36,18 @@ function client(name, options)
     env.UnitName = function(unit) return unit == 'target' and 'Mega Enemy' or name:match('^%S+') end
     env.UnitIsDeadOrGhost = function() return not c.targetAlive end
     env.UnitAffectingCombat = function() return true end
-    env.issecretvalue = function(value) return value == c.secret end
+    env.issecretvalue = function(value) return value ~= nil and value == c.secret end
+    env.Constants = { CharacterNameSeparatorConsts = { CHARACTERNAME_SURNAME_SEPARATOR = ' ' } }
+    env.UnitGUID = function(unit) return c.units[unit] and c.units[unit].guid end
+    env.UnitNameUnmodified = function(unit)
+        local u = c.units[unit]
+        if u then return u.first, u.surname end
+    end
+    env.UnitTokenFromGUID = function(guid)
+        assert(not env.issecretvalue(guid), 'Must not resolve a secret GUID')
+        for token, unit in pairs(c.units) do if unit.guid == guid then return token end end
+    end
+    if options.noKillAPI then env.UnitGUID = false end
     env.print = function(message) table.insert(c.logs, message) end
     env.RaidNotice_AddMessage = function(_, message) table.insert(c.alerts, message) end
     env.PlaySound = function() c.sounds = c.sounds + 1; return true, 1 end
@@ -46,12 +58,16 @@ function client(name, options)
         c.filters[event] = c.filters[event] or {}
         table.insert(c.filters[event], callback)
     end
-    env.C_EventUtils = { IsEventValid = function(event) return event ~= 'CHAT_MSG_COMBAT_HOSTILE_DEATH' end }
+    env.C_EventUtils = { IsEventValid = function(event)
+        return event ~= 'CHAT_MSG_COMBAT_HOSTILE_DEATH' and not (event == 'PARTY_KILL' and options.noPartyKill)
+    end }
     env.CreateFrame = function()
         local frame = { events = {}, scripts = {} }
         function frame:RegisterEvent(event)
             assert(env.C_EventUtils.IsEventValid(event), 'Unsupported client event')
+            if event == 'PARTY_KILL' and options.rejectPartyKill then error('Registration blocked') end
             self.events[event] = true
+            return true
         end
         function frame:SetScript(event, callback) self.scripts[event] = callback end
         table.insert(c.frames, frame)
@@ -74,10 +90,17 @@ function client(name, options)
         end,
     }
     if options.noAPI then env.C_ChatInfo = false end
-    for _, file in ipairs({'Core.lua', 'Kills.lua', 'GuildKills.lua'}) do
+    for _, file in ipairs({'Core.lua', 'Kills.lua', 'KillDetection.lua', 'GuildKills.lua'}) do
         assert(load(sources[file], file, 't', env))('HuntLista', {})
     end
     c.env = env
+    env.HuntLista.CheckUnit = function() end
+    function c:unit(token, guid, first, surname)
+        self.units[token] = { guid = guid, first = first, surname = surname }
+    end
+    function c:kill(victimGUID, attackerGUID)
+        self:event('PARTY_KILL', attackerGUID or self.units.player.guid, victimGUID)
+    end
     function c:event(event, ...)
         for _, f in ipairs(self.frames) do
             if f.events[event] then f.scripts.OnEvent(f, event, ...) end
@@ -179,7 +202,7 @@ test('manual corrections stay local; unconfirmed, ambiguous and off-list kills d
         for _, message in ipairs({
             'Someone says You have slain Bad Guy.', 'You were slain by Bad Guy.', 'You hit Bad Guy for 300.',
             'Slain Bad Guy.', 'Killed Bad Guy.', 'Zabijasz Bad Guy.', 'You have slain Unknown Player.',
-            'You have slain Bad.', 'You have slain Mega.', 'You have slain Mega-Realm.',
+            'You have slain Bad.', 'You have slain Mega.', 'You have slain Mega-Realm.', 'You have slain Bad Guy-Realm.',
             'You have slain Case Conflict.', 'You have slain |Hitem:1|hBad Guy|h.'
         }) do alice:chat(message) end
         assert(alice.env.HuntLista:GetTotalKills() == 1 and #alice.alerts == 1 and #world.packets == 0)
@@ -194,7 +217,7 @@ test('colored and linked full names and Polish messages retain Unicode', () => {
         local alice = client('Alice')
         local bob = client('Bob')
         alice:chat('|cffffffffYou have slain |Hplayer:Tollwütige Fledermaus|h[Tollwütige Fledermaus]|h.|r')
-        alice:chat('Zabiłeś Bad Guy-Realm!')
+        alice:chat('Zabiłeś Bad Guy!')
         deliver()
         assert(alice.env.HuntLista:GetKillCount('Tollwütige Fledermaus') == 1)
         assert(alice.env.HuntLista:GetKillCount('Bad Guy') == 1)
@@ -270,5 +293,192 @@ test('registration and send failures remain local, do not claim delivery, and ca
         duplicate:chat('You have slain Bad Guy.')
         assert(#world.packets == 1)
         assert(duplicate.env.HuntLista.guildKillStatus:find('nie wyslano', 1, true))
+    `);
+});
+
+test('Forever PARTY_KILL resolves first name and surname and notifies guild once across chat duplicates', () => {
+    scenario(`
+        local alice, bob = client('Alice'), client('Bob')
+        alice:unit('target', 'Player-1-victim', 'Mega', 'Enemy')
+        alice:kill('Player-1-victim')
+        alice:kill('Player-1-victim')
+        alice:chat('You have slain Mega Enemy.')
+        deliver()
+        assert(alice.env.HuntLista:GetKillCount('Mega Enemy') == 1)
+        assert(alice.env.HuntLista:GetKillCount('Mega Rival') == 0)
+        assert(#world.packets == 1 and #alice.alerts == 1 and #bob.alerts == 1)
+        assert(bob.env.HuntLista:GetTotalKills() == 0)
+        world.now = world.now + 4
+        alice:chat('You have slain Mega Enemy.')
+        alice:kill('Player-1-victim')
+        assert(alice.env.HuntLista:GetKillCount('Mega Enemy') == 2 and #world.packets == 2)
+        alice:command('status')
+        assert(table.concat(alice.logs, '\\n'):find('zdarzenia=3, naliczone z listy=1', 1, true))
+    `);
+});
+
+test('pet killing blows count; other players, their pets, NPC victims and mere death do not', () => {
+    scenario(`
+        local alice = client('Alice')
+        alice:unit('target', 'Player-1-victim', 'Bad', 'Guy')
+        alice:kill('Player-1-victim', 'Player-1-someone-else')
+        alice:kill('Player-1-victim', 'Pet-1-someone-else')
+        alice:unit('nameplate1', 'Creature-1-npc', 'Bad', 'Guy')
+        alice:kill('Creature-1-npc')
+        alice:event('UNIT_DIED', 'Player-1-victim')
+        alice:event('PLAYER_PVP_KILLS_CHANGED')
+        assert(alice.env.HuntLista:GetTotalKills() == 0 and #world.packets == 0)
+        alice:kill('Player-1-victim', alice.units.pet.guid)
+        assert(alice.env.HuntLista:GetKillCount('Bad Guy') == 1 and #world.packets == 1)
+    `);
+});
+
+test('GUID observations survive disappearing tokens without guessing or using stale names', () => {
+    scenario(`
+        for _, observation in ipairs({
+            {'target', 'PLAYER_TARGET_CHANGED'}, {'mouseover', 'UPDATE_MOUSEOVER_UNIT'},
+            {'nameplate1', 'NAME_PLATE_UNIT_ADDED'}
+        }) do
+            local alice = client('Alice-' .. observation[1])
+            alice:unit(observation[1], 'Player-1-victim', 'Mega', 'Enemy')
+            alice:event(observation[2], observation[1])
+            alice.units[observation[1]] = nil
+            alice:kill('Player-1-different-victim')
+            assert(alice.env.HuntLista:GetTotalKills() == 0)
+            alice:kill('Player-1-victim')
+            assert(alice.env.HuntLista:GetKillCount('Mega Enemy') == 1)
+            world.now = world.now + 121
+            alice:kill('Player-1-victim')
+            assert(alice.env.HuntLista:GetKillCount('Mega Enemy') == 1)
+        end
+        local reused = client('Reused')
+        reused:unit('target', 'Player-1-other', 'Bad', 'Guy')
+        reused.env.UnitTokenFromGUID = function() return 'target' end
+        reused:kill('Player-1-victim')
+        assert(reused.env.HuntLista:GetTotalKills() == 0)
+    `);
+});
+
+test('the bounded GUID cache evicts old observations but retains the newest victim', () => {
+    scenario(`
+        local alice = client('Alice')
+        for i = 1, 257 do
+            alice:unit('mouseover', 'Player-1-' .. i, 'Bad', 'Guy')
+            alice:event('UPDATE_MOUSEOVER_UNIT')
+        end
+        alice.units.mouseover = nil
+        alice:kill('Player-1-1')
+        assert(alice.env.HuntLista:GetTotalKills() == 0)
+        alice:kill('Player-1-257')
+        assert(alice.env.HuntLista:GetKillCount('Bad Guy') == 1)
+    `);
+});
+
+test('secret event GUIDs, unit GUIDs, tokens and name parts are skipped before inspection', () => {
+    scenario(`
+        local alice = client('Alice')
+        alice:unit('target', 'Player-1-victim', 'Mega', 'Enemy')
+        alice:event('PLAYER_TARGET_CHANGED') -- A public cached name must not bypass a later secret.
+        local secret = setmetatable({}, {
+            __tostring = function() error('Secret value converted to text') end,
+            __index = function() error('Secret value inspected') end,
+            __concat = function() error('Secret value concatenated') end
+        })
+        alice.secret = secret
+        alice:kill(secret)
+        alice:kill('Player-1-victim', secret)
+        alice.units.player.guid = secret
+        alice:kill('Player-1-victim', 'Player-1-Alice')
+        alice.units.player.guid = 'Player-1-Alice'
+        alice.units.pet.guid = secret
+        alice:kill('Player-1-victim', 'Pet-1-unknown')
+        alice.units.pet.guid = 'Pet-1-Alice'
+        alice.units.target.guid = secret
+        alice.env.UnitTokenFromGUID = function() return 'target' end
+        alice:kill('Player-1-victim')
+        alice.units.target.guid = 'Player-1-victim'
+        alice.units.target.first = secret
+        alice:kill('Player-1-victim')
+        alice.units.target.first = 'Mega'
+        alice.units.target.surname = secret
+        alice:kill('Player-1-victim')
+        alice.env.UnitTokenFromGUID = function() return secret end
+        alice:kill('Player-1-victim')
+        assert(alice.env.HuntLista:GetTotalKills() == 0 and #world.packets == 0)
+        alice:command('status')
+        assert(table.concat(alice.logs, '\\n'):find('ukryte dane=8', 1, true))
+    `);
+});
+
+test('native names retain Unicode and hyphens, and incomplete or ambiguous names never get guessed', () => {
+    scenario(`
+        local alice, bob = client('Alice'), client('Bob')
+        for _, parts in ipairs({{'Mega', ''}, {'Case', 'Conflict'}, {'Off', 'List'}, {'Bad', '|Hitem:1'}}) do
+            alice:unit('target', 'Player-1-victim', parts[1], parts[2])
+            alice:kill('Player-1-victim')
+        end
+        assert(alice.env.HuntLista:GetTotalKills() == 0)
+        alice:unit('target', 'Player-1-victim', 'Mega', 'Enemy-Slayer')
+        alice:kill('Player-1-victim')
+        alice:chat('You have slain Mega Enemy-Slayer.')
+        alice:chat('You have slain Mega Enemy-Stranger.')
+        assert(alice.env.HuntLista:GetKillCount('Mega Enemy-Slayer') == 1)
+        assert(alice.env.HuntLista:GetKillCount('Mega Enemy') == 0)
+        alice:unit('target', 'Player-1-other', 'Tollwütige', 'Fledermaus')
+        alice:kill('Player-1-other')
+        alice:unit('target', 'Player-1-full', 'Bad Guy', '')
+        alice:kill('Player-1-full')
+        deliver()
+        assert(alice.env.HuntLista:GetTotalKills() == 3 and #bob.alerts == 3)
+        assert(bob.alerts[1]:find('Mega Enemy-Slayer', 1, true))
+        assert(bob.alerts[2]:find('Tollwütige Fledermaus', 1, true))
+    `);
+});
+
+test('missing APIs, unsupported or blocked PARTY_KILL registration keep the chat fallback usable', () => {
+    scenario(`
+        for _, options in ipairs({{noKillAPI=true}, {noPartyKill=true}, {rejectPartyKill=true}}) do
+            local alice = client('Alice', options)
+            assert(alice.env.HuntLista.killDetectionStatus:find('pozostaja komunikaty czatu', 1, true))
+            alice:unit('target', 'Player-1-victim', 'Mega', 'Enemy')
+            alice:kill('Player-1-victim')
+            assert(alice.env.HuntLista:GetTotalKills() == 0)
+            alice:chat('You have slain Mega Enemy.')
+            assert(alice.env.HuntLista:GetKillCount('Mega Enemy') == 1)
+        end
+        local alice = client('MissingName')
+        alice.env.UnitTokenFromGUID = function() error('No token') end
+        alice:kill('Player-1-victim')
+        alice:command('status')
+        assert(table.concat(alice.logs, '\\n'):find('brak pelnego nicku=1', 1, true))
+        alice.env.UnitTokenFromGUID = function() return 'target' end
+        alice:unit('target', 'Player-1-victim', 'Mega', 'Enemy')
+        alice.env.UnitNameUnmodified = function() error('Unavailable name') end
+        alice:kill('Player-1-victim')
+        assert(alice.env.HuntLista:GetTotalKills() == 0)
+    `);
+});
+
+test('native detection respects toggles and retries a failed guild send without double counting', () => {
+    scenario(`
+        local alice = client('Alice')
+        alice:unit('target', 'Player-1-victim', 'Mega', 'Enemy')
+        alice.env.HuntListaDB.enabled = false
+        alice:kill('Player-1-victim')
+        assert(alice.env.HuntLista:GetTotalKills() == 0 and #world.packets == 0)
+        alice.env.HuntListaDB.enabled = true
+        alice:command('guildkills off')
+        alice:kill('Player-1-victim')
+        assert(alice.env.HuntLista:GetTotalKills() == 1 and #world.packets == 0)
+        alice:command('guildkills on')
+        alice.sendResult = 11
+        alice:kill('Player-1-victim')
+        alice.sendResult = 0
+        alice:kill('Player-1-victim')
+        assert(alice.env.HuntLista:GetTotalKills() == 1 and #world.packets == 1)
+        alice:event('PLAYER_LOGIN') -- Initializing twice must not create two listeners.
+        world.now = world.now + 4
+        alice:kill('Player-1-victim')
+        assert(alice.env.HuntLista:GetTotalKills() == 2 and #world.packets == 2)
     `);
 });

@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.3.8"
+HL.version = "1.3.9"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -138,6 +138,7 @@ function HL:GetSharedTotalKills()
 end
 
 local function SafeCacheUnit(unit)
+    if HL.CacheKillUnit then HL:CacheKillUnit(unit) end
     if HL.CacheUnit then pcall(function() HL:CacheUnit(unit) end) end
 end
 
@@ -159,6 +160,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
         end
     elseif event == "PLAYER_LOGIN" then
         RebuildLookup()
+        if HL.InitKillDetection then HL:InitKillDetection() end
         if HL.InitDeathModule then pcall(function() HL:InitDeathModule() end) end
     elseif event == "PLAYER_TARGET_CHANGED" then
         SafeCacheUnit("target")
@@ -194,6 +196,7 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         print("  Graczy: " .. HL:GetPlayerCount())
         print("  Zabojstwa gildii: " .. HL:GetSharedTotalKills())
         print("  Zabojstwa lokalne (Ty): " .. (HL.GetTotalKills and HL:GetTotalKills() or 0))
+        if HL.PrintKillDetectionStatus then HL:PrintKillDetectionStatus() end
         print("  Death popup: " .. ((HuntListaDB.deathPopup ~= false) and "ON" or "OFF"))
         print("  Sound: " .. ((HuntListaDB.sound ~= false) and "ON" or "OFF") .. " (" .. (HuntListaDB.soundPreset or "raid") .. ")")
         print("  Powiadomienia gildii: " .. (HuntListaDB.guildKillAlerts and "ON" or "OFF") .. " (" .. (HL.guildKillStatus or "?") .. ")")
