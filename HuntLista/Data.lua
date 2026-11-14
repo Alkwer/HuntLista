@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-14.4",
-    lastUpdate = "2026-11-14 16:43",
+    version = "2026-11-14.5",
+    lastUpdate = "2026-11-14 16:44",
     updatedBy = "DiscordBot",
 
     players = {
@@ -136,9 +136,9 @@ HuntLista_Data = {
             lastKillAt = "",
         },
         ["Hacz Ling"] = {
-            reason = "xd",
-            addedBy = "frethborn",
-            addedAt = "2026-11-09",
+            reason = "nie potrafi poczekac 30s",
+            addedBy = "kkkelv",
+            addedAt = "2026-11-14",
             note = "",
             kills = "0",
             lastKillBy = "",
