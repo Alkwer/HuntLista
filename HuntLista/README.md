@@ -9,6 +9,7 @@ Gildyjny addon do oznaczania konkretnych graczy PvP w **WoW Forever**.
 - Wyświetla alert + dźwięk gdy ktoś z listy pojawi się w pobliżu
 - Komenda `/hl` lub `/huntlista` → okno z całą listą
 - Dane aktualizowane z GitHuba (przez Discord bota)
+- Od 1.3.9: własne zabójstwa graczy z listy (także przez peta) wykrywane przez `PARTY_KILL`, z lokalnym licznikiem i powiadomieniem gildii. Ukryte dane i brak pełnego nicku są pomijane; `/hl status` pokazuje diagnostykę. Wspólny ranking nadal aktualizuje `/hunt kill Nick` na Discordzie.
 
 ## Instalacja
 
@@ -17,6 +18,8 @@ Gildyjny addon do oznaczania konkretnych graczy PvP w **WoW Forever**.
    World of Warcraft\_forever_\Interface\AddOns\
    ```
 2. Włącz addon na ekranie wyboru postaci.
+
+Przy aktualizacji pobierz cały folder, również `KillDetection.lua` i `HuntLista.toc`, i uruchom ponownie grę. Updater danych nie aktualizuje kodu. Szczegóły i próba w grze: [wykrywanie zabójstw](../docs/forever-kill-detection.md).
 
 ## Aktualizacja listy (zalecane)
 

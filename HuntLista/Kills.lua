@@ -15,6 +15,7 @@ end
 local function KillKey(name)
     if not name then return nil end
     name = strlower(strtrim(name))
+    if HuntLista_Lookup[name] then return name end
     if HL.GetInfo then
         local info = HL:GetInfo(name)
         if info and info.name then
@@ -79,12 +80,15 @@ local function ShowKillAlert(display, count, reason)
 end
 
 function HL:RecordKill(name, source)
+    if issecretvalue and issecretvalue(name) then return false end
     if type(name) ~= "string" or name == "" then return false end
 
     local info
-    if source == "chat" then
-        local fullName = HL:NormalizeName(name)
-        if fullName then info = HuntLista_Lookup[strlower(fullName)] end
+    local automatic = source == "chat" or source == "party_kill"
+    if automatic then
+        if HuntListaDB and HuntListaDB.enabled == false then return false end
+        -- Forever uses surnames, including hyphens; never strip one as a realm suffix.
+        info = HuntLista_Lookup[strlower(strtrim(name))]
         if info and info.ambiguousName then return false end
     else
         info = HL.GetInfo and HL:GetInfo(name)
@@ -100,7 +104,7 @@ function HL:RecordKill(name, source)
     local key = strlower(strtrim(display))
 
     -- Wysylka ma wlasna deduplikacje i moze ponowic probe po bledzie.
-    if source == "chat" and HL.BroadcastGuildKill then
+    if automatic and HL.BroadcastGuildKill then
         HL:BroadcastGuildKill(display)
     end
 

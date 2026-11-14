@@ -46,6 +46,7 @@ UI.lua
 Alerts.lua
 Death.lua
 Kills.lua
+KillDetection.lua
 GuildKills.lua
 ```
 
@@ -69,18 +70,26 @@ GuildKills.lua
 | `/hl close` | Zamyka okienko zabójcy |
 | `/hl guildkills on` | Włącza wysyłanie i odbieranie powiadomień o zabójstwach |
 | `/hl guildkills off` | Wyłącza powiadomienia o zabójstwach dla tej instalacji addona |
+| `/hl kills` | Wspólny ranking i osobny licznik lokalny |
+| `/hl kill Nick` | Ręczna korekta lokalna; wspólny ranking zmienia `/hunt kill Nick` na Discordzie |
 
 Alias: `/huntlista` działa tak samo jak `/hl`.
 
 ### Powiadomienia o zabójstwach w gildii
 
-Wszyscy uczestnicy muszą mieć addon w wersji **1.3.0 lub nowszej** i być online w tej samej gildii. Powiadomienia są domyślnie włączone. Gdy gra wyśle rozpoznany komunikat o zabiciu przez Ciebie konkretnego gracza z listy (np. `You have slain Mega Enemy.`), addon wysyła informację ukrytym kanałem addonowym `GUILD`. Pozostali zobaczą komunikat „Zabójstwo: kto → kogo” i usłyszą dźwięk zgodnie ze swoim ustawieniem `sound`. Zwykły czat gildyjny pozostaje bez nowych wpisów.
+Wersja **1.3.9** wykrywa zabójstwa przez natywne zdarzenie Forever `PARTY_KILL`: sprawdza, czy śmiertelny cios należał do Ciebie lub Twojego peta, czy ofiarą jest gracz i czy pełny nick jednoznacznie pasuje do listy. Imię i nazwisko są odczytywane razem. Śmierć targetu, asysta lub zabójstwo innego członka grupy nie wystarczają.
+
+Nadawca powinien mieć **1.3.9 lub nowszą**; odbiorcy mogą mieć **1.3.0 lub nowszą**. Wszyscy muszą być online w tej samej gildii. Powiadomienia są domyślnie włączone. Addon wysyła informację ukrytym kanałem addonowym `GUILD`. Pozostali zobaczą komunikat „Zabójstwo: kto → kogo” i usłyszą dźwięk zgodnie ze swoim ustawieniem `sound`. Zwykły czat gildyjny pozostaje bez nowych wpisów.
 
 Wiadomości nie zwiększają lokalnych liczników odbiorców i nie są przekazywane dalej. Powtórzenia tego samego zgłoszenia są tłumione przez 3 sekundy. Odbiorca może mieć starszą listę i nadal otrzyma powiadomienie.
 
-Automatyczny lokalny licznik i powiadomienie gildii wymagają rozpoznanego komunikatu w pierwszej osobie z pełną, jednoznaczną nazwą gracza z listy. Sama śmierć targetu nie nalicza zabójstwa. `/hl kill Nick` pozostaje ręczną korektą lokalną i nie ogłasza zabójstwa gildii. Jeśli klient Forever nie dostarczy potwierdzenia, automatyczne naliczenie i powiadomienie nie powstaną. Błędy lub blokady wysyłania są pokazane lokalnie; status komunikacji jest dostępny pod `/hl status`.
+Jeśli klient ukrywa GUID lub nazwę (`secret values`), addon pomija zdarzenie. Gdy zniknie token jednostki, może użyć pełnego nicku zaobserwowanego dla dokładnie tego GUID-u na targetcie, mouseover lub nameplate w ostatnich 120 sekundach (pamięć maksymalnie 256 graczy). Nie zgaduje nazwiska po pierwszym słowie. Brak pełnego nicku oznacza brak naliczenia. Rozpoznany komunikat w pierwszej osobie, np. `You have slain Mega Enemy.`, pozostaje dodatkowym źródłem potwierdzenia; duplikaty obu źródeł są tłumione wspólnie.
 
-Instalacja tej funkcji wymaga aktualizacji całego folderu `HuntLista`, w tym nowego `GuildKills.lua` i pliku `.toc`, oraz `/reload`. Updatery pobierające tylko `Data.lua` nie instalują nowego kodu addona.
+`/hl status` pokazuje rejestrację wykrywania, liczbę zdarzeń od `/reload`, naliczenia z listy oraz pominięcia przez ukryte dane, brak nicku i cudzego zabójcę. Sama rejestracja nie potwierdza otrzymania zabójstwa. Błędy wysyłania są pokazane lokalnie. [Źródła API i procedura sprawdzenia w grze](docs/forever-kill-detection.md).
+
+Automatyka zmienia **lokalny licznik i wysyła powiadomienie w grze**. Nie aktualizuje wspólnego rankingu na GitHubie/Discordzie — nadal służy do tego `/hunt kill Nick`. `/hl kill Nick` pozostaje ręczną korektą lokalną i nie ogłasza zabójstwa gildii.
+
+Instalacja tej funkcji wymaga aktualizacji całego folderu `HuntLista`, w tym `KillDetection.lua`, `GuildKills.lua` i pliku `.toc`, oraz ponownego uruchomienia gry po dodaniu nowego modułu. Updatery pobierające tylko `Data.lua` nie instalują nowego kodu addona.
 
 ---
 

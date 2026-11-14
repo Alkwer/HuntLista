@@ -64,8 +64,8 @@ end
 
 function HL:BroadcastGuildKill(name)
     if not Enabled() or not IsInGuild() or not ValidName(name, 128) then return false end
-    local normalized = HL.NormalizeName and HL:NormalizeName(name) or name
-    local info = HuntLista_Lookup and HuntLista_Lookup[strlower(normalized)]
+    -- RecordKill passes the canonical list name, including hyphenated surnames.
+    local info = HuntLista_Lookup and HuntLista_Lookup[strlower(name)]
     if not info or not ValidName(info.name, 128) then return false end
     local victim = info.name
     local key = strlower(victim)
