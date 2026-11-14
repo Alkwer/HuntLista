@@ -4,8 +4,8 @@
 -- ============================================================
 
 HuntLista_Data = {
-    version = "2026-11-14.2",
-    lastUpdate = "2026-11-14 10:19",
+    version = "2026-11-14.3",
+    lastUpdate = "2026-11-14 16:43",
     updatedBy = "DiscordBot",
 
     players = {
@@ -193,6 +193,15 @@ HuntLista_Data = {
             reason = "kolega pedala",
             addedBy = "frethborn",
             addedAt = "2026-11-10",
+            note = "",
+            kills = "0",
+            lastKillBy = "",
+            lastKillAt = "",
+        },
+        ["Majestic Chalisa"] = {
+            reason = "kurwa jebana nie potrafi auto q wylaczyc",
+            addedBy = "haczkes",
+            addedAt = "2026-11-14",
             note = "",
             kills = "0",
             lastKillBy = "",
