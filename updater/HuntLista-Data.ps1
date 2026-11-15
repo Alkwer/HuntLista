@@ -127,6 +127,8 @@ namespace HuntLista {
             if (Eat('}')) return result;
             while (true) {
                 string key;
+                // Lua lexes a long string opener as one token, including the first '['.
+                if (LongStringStart()) throw Invalid();
                 if (Eat('[')) { key = StringValue(); Expect(']'); }
                 else key = Identifier();
                 Expect('=');
@@ -216,18 +218,45 @@ function Save-HuntListaData {
     }
 }
 
+function Open-HuntListaUpdateLock {
+    param([string]$Path)
+    $wait = [System.Diagnostics.Stopwatch]::StartNew()
+
+    while ($true) {
+        try {
+            return [System.IO.FileStream]::new($Path, [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None, 4096, [System.IO.FileOptions]::DeleteOnClose)
+        } catch {
+            $cause = $_.Exception.GetBaseException()
+            $errorCode = $cause.HResult -band 0xFFFF
+            if ($cause -isnot [System.IO.IOException] -or $errorCode -notin 32, 33) { throw }
+            if ($wait.ElapsedMilliseconds -ge 3000) {
+                throw 'Inna aktualizacja Data.lua jest w toku. Sprobuj ponownie.'
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+}
+
 function Update-HuntListaData {
     param([Parameter(Mandatory = $true)][string]$Uri, [Parameter(Mandatory = $true)][string]$TargetPath)
     $ErrorActionPreference = 'Stop'
-    $directory = [System.IO.Path]::GetDirectoryName([System.IO.Path]::GetFullPath($TargetPath))
+    $target = [System.IO.Path]::GetFullPath($TargetPath)
+    $directory = [System.IO.Path]::GetDirectoryName($target)
     $download = Join-Path $directory ('.HuntLista-download-' + [guid]::NewGuid().ToString('N') + '.tmp')
+    # Acquire before downloading so a delayed response cannot overwrite a newer response.
+    $lock = Open-HuntListaUpdateLock -Path ($target + '.update.lock')
     try {
         Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec 25 -OutFile $download -ErrorAction Stop | Out-Null
         if ((Get-Item -LiteralPath $download -ErrorAction Stop).Length -gt 1MB) { throw 'Data.lua jest zbyt duzy.' }
         $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
         $content = $utf8.GetString([System.IO.File]::ReadAllBytes($download))
-        Save-HuntListaData -Content $content -TargetPath $TargetPath
+        Save-HuntListaData -Content $content -TargetPath $target
     } finally {
-        if ([System.IO.File]::Exists($download)) { [System.IO.File]::Delete($download) }
+        try {
+            if ([System.IO.File]::Exists($download)) { [System.IO.File]::Delete($download) }
+        } finally {
+            $lock.Dispose()
+        }
     }
 }

@@ -37,7 +37,10 @@ Updater sam ściąga najnowszy `Data.lua` z GitHuba i nadpisuje plik w folderze 
 |------------------|--------------------------|
 | `/hl`            | Otwiera listę            |
 | `/hl status`     | Wersja danych + liczba   |
-| `/hl reload`     | Przeładowuje lookup      |
+| `/reload`        | Wczytuje nowe dane z dysku |
+| `/hl reload`     | Przypomina o użyciu `/reload` |
+| `/hl killreset Nick` | Zeruje lokalny licznik pełnego nicku |
+| `/hl killreset all confirm` | Zeruje wszystkie lokalne liczniki |
 
 ## Jak działa aktualizacja
 
@@ -70,7 +73,7 @@ Osobny folder `HuntListaBot`.
 ```bash
 cd HuntListaBot
 cp .env.example .env
-# uzupełnij .env
+# uzupełnij .env, w tym wymagane CLIENT_ID i GUILD_ID
 npm install
 npm start
 ```
@@ -79,7 +82,10 @@ npm start
 
 - `/hunt add <nick> [powód]`
 - `/hunt remove <nick>`
-- `/hunt list`
+- `/hunt list [strona]`
 - `/hunt info <nick>`
+- `/hunt kills [strona]`
+
+Komendy działają wyłącznie na serwerze wskazanym przez `GUILD_ID`. Domyślnie zapis jest dostępny administratorom; opcjonalne `CONTRIBUTOR_ROLE_IDS` i `MODERATOR_ROLE_IDS` nadają dostęp do odpowiednich operacji. Szczegóły uprawnień i migracji: [główne README](../README.md#discord-bot-dla-adminów).
 
 Po każdej zmianie bot pushuje nowy `Data.lua` na GitHub.

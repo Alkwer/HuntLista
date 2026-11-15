@@ -40,8 +40,6 @@ local function CleanPlayerName(name)
         n = n:gsub(" *<[^>]*> *", " ")
         n = strtrim(n)
         n = n:gsub("[%.%!%?]+$", "")
-        local before = n:match("^(.+)%-[^%- ]+$")
-        if before then n = before end
         n = strtrim(n)
         n = n:gsub("  +", " ")
         if n == "" then return nil end
@@ -83,39 +81,12 @@ local function SeedCacheFromData()
 end
 
 function HL:ResolveFullName(name)
-    name = CleanPlayerName(name)
-    if not name then return nil end
-
-    local fw = FirstWord(name)
-    local cached = fw and HL.NameCache[fw]
-    if cached then
-        cached = CleanPlayerName(cached)
-        if cached and #cached >= #name then return cached end
-    end
-
-    if HL.GetInfo then
-        local info = HL:GetInfo(name)
-        if info and info.name then
-            local n = CleanPlayerName(info.name)
-            if n then return n end
-        end
-    end
-
-    if HuntLista_Data and HuntLista_Data.players and fw then
-        for full, _ in pairs(HuntLista_Data.players) do
-            local key = strlower(strtrim(full))
-            if key == fw or key:sub(1, #fw + 1) == fw .. " " then
-                return CleanPlayerName(full) or full
-            end
-        end
-    end
-
-    return name
+    return CleanPlayerName(name)
 end
 
 local function SafeUnitName(unit)
     if not unit or not UnitExists(unit) then return nil end
-    local ok, n = pcall(UnitName, unit)
+    local ok, n = pcall(function() return HL:GetUnitFullName(unit) end)
     if not ok or type(n) ~= "string" then return nil end
     if issecretvalue and issecretvalue(n) then return nil end
     n = CleanPlayerName(n)

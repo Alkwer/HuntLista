@@ -58,7 +58,8 @@ GuildKills.lua
 |--------|------|
 | `/hl` | Otwiera listę huntowanych graczy |
 | `/hl status` | Wersja addona, wersja danych, liczba graczy, status modułów |
-| `/hl reload` | Przeładowuje listę z `Data.lua` (bez `/reload` gry) |
+| `/reload` | Wczytuje zaktualizowany `Data.lua` przez przeładowanie interfejsu gry |
+| `/hl reload` | Przypomina o użyciu `/reload`; samo nie wczytuje pliku |
 | `/hl test` | **Tryb testowy ON** — alertuje też sojuszników |
 | `/hl test off` | Tryb testowy OFF — tylko wroga frakcja |
 | `/hl death` | Włącza okienko po śmierci |
@@ -72,8 +73,12 @@ GuildKills.lua
 | `/hl guildkills off` | Wyłącza powiadomienia o zabójstwach dla tej instalacji addona |
 | `/hl kills` | Wspólny ranking i osobny licznik lokalny |
 | `/hl kill Nick` | Ręczna korekta lokalna; wspólny ranking zmienia `/hunt kill Nick` na Discordzie |
+| `/hl killreset Nick` | Zeruje lokalny licznik pełnego nicku |
+| `/hl killreset all confirm` | Jawnie zeruje wszystkie lokalne liczniki |
 
 Alias: `/huntlista` działa tak samo jak `/hl`.
+
+Od **1.3.10** alerty, ikony i ręczne naliczanie wymagają pełnego, jednoznacznego nicku. Addon łączy imię i nazwisko zwracane przez API Forever, zachowuje łączniki i pomija ukryte nazwy. Nie dopasowuje osoby po samym imieniu do podobnego wpisu na liście. Czaszka przy targetcie pozostaje widoczna tak długo, jak cel spełnia warunki, i znika przy zmianie na inną osobę. Ustawienia alertów sterują komunikatem i dźwiękiem, a `showIcon` osobno steruje ikonami.
 
 ### Powiadomienia o zabójstwach w gildii
 
@@ -152,8 +157,11 @@ Folder: [`HuntListaBot/`](https://github.com/frethborn/HuntLista/tree/main/HuntL
 |--------|------|
 | `/hunt add <nick> [powód]` | Dodaje gracza na listę |
 | `/hunt remove <nick>` | Usuwa z listy |
-| `/hunt list` | Pokazuje aktualną listę |
+| `/hunt list [strona]` | Pokazuje listę, np. `/hunt list strona:2` |
 | `/hunt info <nick>` | Szczegóły wpisu |
+| `/hunt kill <nick> [ile]` | Dodaje zabójstwa do wspólnego licznika |
+| `/hunt kills [strona]` | Pokazuje cały ranking na kolejnych stronach |
+| `/hunt killreset <nick>` | Zeruje wspólny licznik gracza |
 
 ### Szybki setup
 
@@ -163,18 +171,20 @@ Folder: [`HuntListaBot/`](https://github.com/frethborn/HuntLista/tree/main/HuntL
 4. W folderze bota:
    ```bash
    cp .env.example .env
-   # uzupelnij DISCORD_TOKEN, GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO
+   # uzupelnij DISCORD_TOKEN, CLIENT_ID, GUILD_ID, GITHUB_TOKEN i dane repozytorium
    npm install
    npm start
    ```
 
-Bot odczytuje `Data.lua` z GitHuba przed każdą komendą. Plik w repozytorium jest źródłem danych; brak lub uszkodzenie starego `local_data.json` nie zeruje listy. Ten lokalny plik nie jest już używany. Przed aktualizacją bota zachowaj jego kopię, jeśli zawiera zmiany, których poprzednia wersja nie wysłała na GitHuba, i dodaj brakujące wpisy ponownie przez Discord.
+**Przy aktualizacji bota:** `GUILD_ID` jest teraz wymagane. Bot rejestruje komendy na tym serwerze i sprawdza serwer oraz członkostwo przy każdym wywołaniu. `list`, `info` i `kills` są dostępne członkom tego serwera. Domyślnie tylko użytkownicy z uprawnieniem **Administrator** mogą zmieniać dane. W `.env` można podać ID ról rozdzielone przecinkami: `CONTRIBUTOR_ROLE_IDS` zezwala na `add` i `kill`, a `MODERATOR_ROLE_IDS` także na `remove` i `killreset`. Puste listy ról pozostawiają zapis tylko administratorom. Restart bota rejestruje opcję `strona`; jeśli stara instalacja używała komend globalnych, administrator może usunąć ich dawną rejestrację, aby uniknąć duplikatów. Kod odrzuca ich wywołania spoza skonfigurowanego serwera.
+
+Bot odczytuje `Data.lua` z GitHuba przed każdą dozwoloną komendą. Plik w repozytorium jest źródłem danych; brak lub uszkodzenie starego `local_data.json` nie zeruje listy. Ten lokalny plik nie jest już używany. Przed aktualizacją bota zachowaj jego kopię, jeśli zawiera zmiany, których poprzednia wersja nie wysłała na GitHuba, i dodaj brakujące wpisy ponownie przez Discord.
 
 Komendy zmieniające dane (`/hunt add`, `remove`, `kill`, `killreset`) dopasowują **pełny nick**, bez rozróżniania wielkości liter. Skrót nie usuwa wpisu ani nie zmienia jego licznika. `/hunt add Audit` tworzy osobnego gracza `Audit`, nawet gdy istnieje `Audit Alpha`; aktualizacja wymaga wpisania `Audit Alpha`.
 
 Odczyt danych nie wykonuje kodu Lua. Niepoprawny format, brak pliku lub błąd odczytu blokują zapis. Komendy zmieniające listę są wykonywane kolejno, a konflikt SHA z innym zapisem wymaga ponowienia komendy. Przy niepewnym wyniku połączenia najpierw sprawdź `/hunt list`.
 
-Testy regresji (Node.js 20+): w folderze `HuntListaBot` uruchom `npm ci` i `npm test`. Testy obejmują zapis/odczyt tekstu Lua, operacje na liście z atrapą GitHuba, wykrywanie zabójcy, licznik, dźwięki oraz powiadomienia między symulowanymi klientami gildii z atrapami API WoW. Na Windows uruchamiają też Windows PowerShell 5.1: sprawdzają zgodność walidatora z parserem bota, podmianę plików, backup, błędy pobierania/zapisu i oba updatery. Ten test jest pomijany na innych systemach. Testy nie wymagają tokenów ani połączenia z grą; pliki testowe powstają w izolowanym katalogu tymczasowym.
+Testy regresji: w folderze `HuntListaBot` uruchom `npm ci --ignore-scripts` i `npm test`. CI sprawdza Node.js 22 i 26 na Windows. Testy obejmują zapis/odczyt tekstu Lua, role bota, stronicowanie w limitach Discorda, operacje na liście z atrapą GitHuba, pełne nazwy, ikony i przełączniki alertów, wykrywanie zabójcy, licznik, dźwięki oraz powiadomienia między symulowanymi klientami gildii z atrapami API WoW. Na Windows uruchamiają też Windows PowerShell 5.1: sprawdzają zgodność walidatora z parserem bota, podmianę plików, backup, błędy pobierania/zapisu, edycję ścieżki GUI oraz równoległe procesy updaterów. Testy Windows są pomijane na innych systemach. Nie wymagają tokenów ani połączenia z grą; pliki testowe powstają w izolowanych katalogach tymczasowych. Testy z atrapami nie zastępują próby w żywym kliencie Forever i na działającym bocie.
 
 ---
 
@@ -197,9 +207,9 @@ auto-updater/       ← auto updater z GUI (co X minut)
 
 ## Uwagi (WoW Forever)
 
-- Nicki ze **spacją** (np. `Mega Chad`) — gra często zwraca tylko pierwsze słowo w API; addon stara się je uzupełniać z nameplate’ów i listy.
+- Nicki ze **spacją** (np. `Mega Chad`) — addon czyta imię i nazwisko z API; brak pełnej, jawnej nazwy oznacza pominięcie alertu, bez zgadywania osoby.
 - Domyślnie alerty tylko na **przeciwną frakcję**. Do testów: `/hl test`.
-- Po zmianie `Data.lua` zawsze `/reload` albo `/hl reload`.
+- Po zmianie `Data.lua` zawsze `/reload`. `/hl reload` wyświetla jedynie tę instrukcję.
 - Czerwony komunikat Blizzarda o „blocked action” przy śmierci — kliknij **Ignore**; na listę i czaszkę nie wpływa.
 - W `Death.lua` eventy wpinają się z lekkim opóźnieniem po logowaniu (omija błędy protected `RegisterEvent` na Forever).
 

@@ -45,6 +45,13 @@ Case 'repeat invalid downloads cannot erase the last good backup' {
     Same $target $next
     Same $backup $original
 }
+Case 'rejected syntax fixtures never replace installed data or its backup' {
+    foreach ($case in $cases) {
+        if (-not $case.accepted) { Reject { Save-HuntListaData -Content $case.content -TargetPath $target } }
+    }
+    Same $target $next
+    Same $backup $original
+}
 Case 'no-op preserves previous backup' {
     Save-HuntListaData -Content $next -TargetPath $target | Out-Null
     Same $backup $original
@@ -131,5 +138,66 @@ Case 'GUI reports parsed metadata only after success' {
     Same $target $next
     Same $backup $original
 }
+foreach ($functionName in @('Save-Config', 'Set-AddonDirFromInput', 'Set-Running')) {
+    $definition = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $functionName }, $true)
+    . ([scriptblock]::Create($definition.Extent.Text))
+}
+function ClickHandler($Name) {
+    $click = $ast.Find({ param($node)
+        $node -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and
+        $node.Member.Value -eq 'Add_Click' -and $node.Expression.VariablePath.UserPath -eq $Name
+    }, $true)
+    return $click.Arguments[0].ScriptBlock.GetScriptBlock()
+}
+$ConfigPath = Join-Path $FixtureDirectory 'gui-config.txt'
+$script:txtPath = [pscustomobject]@{ Text = ''; ReadOnly = $false }
+$script:btnBrowse = [pscustomobject]@{ Enabled = $true }
+$script:btnToggle = [pscustomobject]@{ Text = ''; BackColor = $null }
+$script:numInterval = [pscustomobject]@{ Value = 5 }
+$script:timer = [pscustomobject]@{ Interval = 0; Active = $false }
+$script:timer | Add-Member ScriptMethod Start { $this.Active = $true }
+$script:timer | Add-Member ScriptMethod Stop { $this.Active = $false }
+$guiDirectory = Join-Path $FixtureDirectory 'gui-path[1]'
+[void][System.IO.Directory]::CreateDirectory($guiDirectory)
+try {
+    Case 'Update now uses the edited literal directory instead of cached state' {
+        $script:addonDir = $FixtureDirectory
+        $script:txtPath.Text = $guiDirectory
+        $script:downloadBytes = $utf8.GetBytes($original)
+        & (ClickHandler 'btnNow')
+        Check ($script:addonDir -ceq $guiDirectory) 'Stale GUI directory retained'
+        Same (Join-Path $guiDirectory 'Data.lua') $original
+        Same $target $next
+    }
+    Case 'Start uses the edited path and freezes path editing until Stop' {
+        $script:addonDir = $FixtureDirectory
+        $script:running = $false
+        $script:txtPath.Text = $guiDirectory
+        & (ClickHandler 'btnToggle')
+        Check ($script:addonDir -ceq $guiDirectory -and $script:timer.Active) 'Start used the wrong directory'
+        Check ($script:txtPath.ReadOnly -and -not $script:btnBrowse.Enabled) 'Running path can still be edited'
+    }
+    Case 'Stop works when the configured directory no longer exists' {
+        $script:addonDir = Join-Path $FixtureDirectory 'missing-addon'
+        & (ClickHandler 'btnToggle')
+        Check (-not $script:timer.Active -and -not $script:running) 'Stop rejected a missing directory'
+        Check (-not $script:txtPath.ReadOnly -and $script:btnBrowse.Enabled) 'Path editing not restored'
+    }
+    Case 'invalid edited path cannot silently update the old directory' {
+        $script:addonDir = $FixtureDirectory
+        $script:txtPath.Text = Join-Path $FixtureDirectory 'missing-addon'
+        $script:downloadBytes = $utf8.GetBytes($original)
+        & (ClickHandler 'btnNow')
+        Same $target $next
+        Check ($script:lblStatus.Text -eq 'Status: BLAD') 'Missing directory not reported'
+    }
+    Check (-not [System.IO.File]::Exists((Join-Path $guiDirectory 'Data.lua.update.lock'))) 'GUI update lock leaked'
+    Check (@(Get-ChildItem -LiteralPath $guiDirectory -Filter '.HuntLista-*.tmp').Count -eq 0) 'GUI staging file leaked'
+} finally {
+    # Only files in this freshly-created fixture directory, no recursive deletion.
+    foreach ($file in [System.IO.Directory]::GetFiles($guiDirectory)) { [System.IO.File]::Delete($file) }
+    [System.IO.Directory]::Delete($guiDirectory)
+}
 Check (@(Get-ChildItem -LiteralPath $FixtureDirectory -Filter '.HuntLista-*.tmp').Count -eq 0) 'Staging files leaked after success/failure'
+Check (@(Get-ChildItem -LiteralPath $FixtureDirectory -Filter '*.update.lock').Count -eq 0) 'Update locks leaked after success/failure'
 Write-Output ('PASS: updater checks ' + $script:checks + ' on PowerShell ' + $PSVersionTable.PSVersion)

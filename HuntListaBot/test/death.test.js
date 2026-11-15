@@ -212,6 +212,17 @@ test('manual killer popup remains available without a death message', () => {
     `);
 });
 
+test('confirmed killer preserves a hyphenated surname and never expands a cached first name', () => {
+    scenario(`
+        HuntLista.NameCache.zed = 'Zed Someone Else'
+        chat('You were slain by Zed Alpha-Beta.')
+        tick(true)
+        tick(true, 0.31)
+        assert(HuntListaDeathFrame.editBox.text == 'Zed Alpha-Beta')
+        assert(HuntLista:ResolveFullName('Zed') == 'Zed')
+    `);
+});
+
 test('debug polling stays quiet without a fresh killer and logs a late match only once', () => {
     scenario(`
         HuntListaDB.debug = true
