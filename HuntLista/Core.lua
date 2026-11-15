@@ -6,7 +6,7 @@ local addonName, ns = ...
 HuntLista = HuntLista or {}
 local HL = HuntLista
 
-HL.version = "1.3.9"
+HL.version = "1.3.10"
 HL.dataVersion = (HuntLista_Data and HuntLista_Data.version) or "brak"
 
 local defaults = {
@@ -98,24 +98,38 @@ local function RebuildLookup()
 end
 
 function HL:NormalizeName(name)
-    if not name or name == "" then return nil end
+    if issecretvalue and issecretvalue(name) then return nil end
+    if type(name) ~= "string" then return nil end
     name = strtrim(name)
-    local base = name:match("^(.-)%-.+$")
-    if base and base ~= "" then name = base end
+    if name == "" or name:find("[%c|]") then return nil end
     return name
+end
+
+-- Forever returns first name and surname separately. Never infer a surname
+-- from the hunt list, or retry another API after receiving hidden identity.
+function HL:GetUnitFullName(unit)
+    if issecretvalue and issecretvalue(unit) then return nil end
+    if type(unit) ~= "string" or unit == "" then return nil end
+    local read = UnitNameUnmodified or UnitName
+    if not read then return nil end
+    local ok, first, surname = pcall(read, unit)
+    if not ok then return nil end
+    if issecretvalue and (issecretvalue(first) or issecretvalue(surname)) then return nil end
+    if type(first) ~= "string" or first == "" then return nil end
+    if surname ~= nil and type(surname) ~= "string" then return nil end
+    if surname and surname ~= "" then
+        local constants = Constants and Constants.CharacterNameSeparatorConsts
+        first = first .. (constants and constants.CHARACTERNAME_SURNAME_SEPARATOR or " ") .. surname
+    end
+    return HL:NormalizeName(first)
 end
 
 function HL:GetInfo(name)
     name = HL:NormalizeName(name)
     if not name then return nil end
     local key = strlower(name)
-    if HuntLista_Lookup[key] then return HuntLista_Lookup[key] end
-    if #key >= 3 then
-        for k, info in pairs(HuntLista_Lookup) do
-            if #k > #key and k:sub(1, #key + 1) == key .. " " then return info end
-        end
-    end
-    return nil
+    local info = HuntLista_Lookup[key]
+    if info and not info.ambiguousName then return info end
 end
 
 function HL:IsOnList(name) return HL:GetInfo(name) ~= nil end
@@ -148,6 +162,7 @@ frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_TARGET_CHANGED")
 frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 frame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+frame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
 
 frame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -165,14 +180,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_TARGET_CHANGED" then
         SafeCacheUnit("target")
         if HL.OnTargetChangedDeath then pcall(function() HL:OnTargetChangedDeath() end) end
-        if HuntListaDB and HuntListaDB.alertOnTarget then HL:CheckUnit("target") end
+        HL:CheckUnit("target")
     elseif event == "UPDATE_MOUSEOVER_UNIT" then
         SafeCacheUnit("mouseover")
-        if HuntListaDB and HuntListaDB.alertOnMouseover then HL:CheckUnit("mouseover") end
+        HL:CheckUnit("mouseover")
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         local unit = ...
         SafeCacheUnit(unit)
-        if HuntListaDB and HuntListaDB.alertOnNameplate then HL:CheckUnit(unit) end
+        HL:CheckUnit(unit)
+    elseif event == "NAME_PLATE_UNIT_REMOVED" then
+        if HL.HideHuntIcon then HL:HideHuntIcon(...) end
     end
 end)
 
@@ -224,14 +241,23 @@ SlashCmdList["HUNTLISTA"] = function(msg)
             end
         end
         if HL.PrintKills then print("|cffaaaaaa--- lokalnie (tylko Ta postac) ---|r"); HL:PrintKills() end
-    elseif msg:match("^killreset") or msg:match("^resetkills") then
+    elseif msg == "reload" then
+        print("Po aktualizacji Data.lua wpisz /reload, aby gra wczytala plik z dysku.")
+    elseif msg == "killreset" or msg == "resetkills" then
+        print("Uzyj /hl killreset Pelny Nick lub /hl killreset all confirm, aby wyzerowac wszystkie lokalne liczniki.")
+    elseif msg == "killreset all confirm" or msg == "resetkills all confirm" then
+        if HL.ResetKills then HL:ResetKills(nil) end
+    elseif msg:match("^killreset%s+") or msg:match("^resetkills%s+") then
         local who = msg:match("^killreset%s+(.+)$") or msg:match("^resetkills%s+(.+)$")
         if HL.ResetKills then HL:ResetKills(who) end
     elseif msg:match("^kill%s+") then
         local who = msg:match("^kill%s+(.+)$")
         if who and HL.RecordKill then
-            HL:RecordKill(who, "manual")
-            print("|cffaaaaaaZglos tez na Discord: /hunt kill " .. who .. "|r")
+            if HL:RecordKill(who, "manual") then
+                print("|cffaaaaaaZglos tez na Discord: /hunt kill " .. who .. "|r")
+            else
+                print("Nie naliczono zabojstwa. Podaj pelny, jednoznaczny nick z listy; nie powtarzaj w ciagu 3 sekund.")
+            end
         end
     elseif msg == "test" or msg == "test on" then
         HuntListaDB.testMode = true
@@ -249,15 +275,14 @@ SlashCmdList["HUNTLISTA"] = function(msg)
         if not HL.ShowKillerPopup then print("|cffff0000Hunt Lista|r modul Death nie zaladowany."); return end
         local name = msg:match("^killer%s+(.+)$")
         if name and name ~= "" then HL:ShowKillerPopup(name)
-        elseif UnitExists("target") and UnitName("target") then SafeCacheUnit("target"); HL:ShowKillerPopup(UnitName("target"))
+        elseif HL:GetUnitFullName("target") then HL:ShowKillerPopup(HL:GetUnitFullName("target"))
         else HL:ShowKillerPopup("Test Nick") end
     elseif msg == "check" then
         for _, unit in ipairs({"target", "mouseover"}) do
             if UnitExists(unit) then
                 SafeCacheUnit(unit)
-                local n = UnitName(unit)
-                local full = HL.ResolveFullName and HL:ResolveFullName(n) or n
-                print("  [" .. unit .. "] " .. tostring(n) .. " -> " .. tostring(full))
+                local full = HL:GetUnitFullName(unit)
+                print("  [" .. unit .. "] " .. (full or "brak jawnego pelnego nicku"))
             end
         end
     elseif msg == "debug" then

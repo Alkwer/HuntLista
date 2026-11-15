@@ -46,27 +46,42 @@ function Find-AddonDir {
         "C:\Games\World of Warcraft\_forever_\Interface\AddOns\HuntLista",
         "D:\Games\World of Warcraft\_forever_\Interface\AddOns\HuntLista"
     )
-    if (Test-Path $ConfigPath) {
-        $saved = (Get-Content $ConfigPath -Raw -ErrorAction SilentlyContinue)
+    if (Test-Path -LiteralPath $ConfigPath -PathType Leaf) {
+        $saved = (Get-Content -LiteralPath $ConfigPath -Raw -ErrorAction SilentlyContinue)
         if ($saved) {
             $saved = $saved.Trim()
-            if ($saved -and (Test-Path $saved)) { return $saved }
+            if ($saved -and (Test-Path -LiteralPath $saved -PathType Container)) { return $saved }
         }
     }
     foreach ($p in $candidates) {
-        if (Test-Path $p) { return $p }
+        if (Test-Path -LiteralPath $p -PathType Container) { return $p }
     }
     return $null
 }
 
 function Save-Config {
     if ($script:addonDir) {
-        try { $script:addonDir | Set-Content -Path $ConfigPath -Encoding UTF8 -Force } catch {}
+        try { $script:addonDir | Set-Content -LiteralPath $ConfigPath -Encoding UTF8 -Force } catch {}
     }
 }
 
+function Set-AddonDirFromInput {
+    $path = $script:txtPath.Text.Trim()
+    if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Container)) {
+        $script:lblStatus.Text = "Status: BLAD"
+        $script:lblStatus.ForeColor = [System.Drawing.Color]::Red
+        Write-Log "Ustaw poprawna sciezke do folderu HuntLista." "Red"
+        return $false
+    }
+    $script:addonDir = $path
+    Save-Config
+    return $true
+}
+
 function Update-Data {
-    if (-not $script:addonDir -or -not (Test-Path $script:addonDir)) {
+    if (-not $script:addonDir -or -not (Test-Path -LiteralPath $script:addonDir -PathType Container)) {
+        $script:lblStatus.Text = "Status: BLAD"
+        $script:lblStatus.ForeColor = [System.Drawing.Color]::Red
         Write-Log "Brak folderu addona - ustaw sciezke." "Orange"
         return $false
     }
@@ -104,6 +119,8 @@ function Update-Data {
 function Set-Running {
     param([bool]$on)
     $script:running = $on
+    $script:txtPath.ReadOnly = $on
+    $script:btnBrowse.Enabled = -not $on
     if ($on) {
         $mins = [int]$script:numInterval.Value
         if ($mins -lt 1) { $mins = 1 }
@@ -155,6 +172,7 @@ $txtPath.Size = New-Object System.Drawing.Size(360, 24)
 $txtPath.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45)
 $txtPath.ForeColor = [System.Drawing.Color]::White
 $form.Controls.Add($txtPath)
+$script:txtPath = $txtPath
 
 $btnBrowse = New-Object System.Windows.Forms.Button
 $btnBrowse.Text = "Wybierz..."
@@ -174,6 +192,7 @@ $btnBrowse.Add_Click({
     }
 })
 $form.Controls.Add($btnBrowse)
+$script:btnBrowse = $btnBrowse
 
 $lblInt = New-Object System.Windows.Forms.Label
 $lblInt.Text = "Interwal (minuty):"
@@ -201,9 +220,7 @@ $btnNow.FlatStyle = "Flat"
 $btnNow.BackColor = [System.Drawing.Color]::FromArgb(70, 100, 160)
 $btnNow.ForeColor = [System.Drawing.Color]::White
 $btnNow.Add_Click({
-    if (-not $script:addonDir) { $script:addonDir = $txtPath.Text.Trim() }
-    Save-Config
-    Update-Data | Out-Null
+    if (Set-AddonDirFromInput) { Update-Data | Out-Null }
 })
 $form.Controls.Add($btnNow)
 
@@ -215,13 +232,11 @@ $btnToggle.FlatStyle = "Flat"
 $btnToggle.BackColor = [System.Drawing.Color]::LightGreen
 $btnToggle.ForeColor = [System.Drawing.Color]::Black
 $btnToggle.Add_Click({
-    if (-not $script:addonDir) { $script:addonDir = $txtPath.Text.Trim() }
-    if (-not $script:addonDir -or -not (Test-Path $script:addonDir)) {
-        [System.Windows.Forms.MessageBox]::Show("Ustaw poprawna sciezke do folderu HuntLista.", "Hunt Lista")
-        return
+    if ($script:running) {
+        Set-Running $false
+    } elseif (Set-AddonDirFromInput) {
+        Set-Running $true
     }
-    Save-Config
-    if ($script:running) { Set-Running $false } else { Set-Running $true }
 })
 $form.Controls.Add($btnToggle)
 $script:btnToggle = $btnToggle

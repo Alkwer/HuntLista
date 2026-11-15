@@ -17,6 +17,7 @@ Prosty programik do aktualizacji listy graczy **bez ręcznego ściągania** z Gi
 - Podmienia poprawny plik atomowo; błędne pobranie nie zmienia zainstalowanych danych
 - Zachowuje poprzedni poprawny plik jako `Data.lua.bak`; uszkodzony lokalny plik nie nadpisuje tej kopii
 - Pokazuje wersję danych
+- Blokuje równoległe pobieranie i zapis tego samego pliku przez nowe wersje obu updaterów; po 3 sekundach oczekiwania zgłasza zajętość, bez zmiany danych
 
 ## Wymagania
 
@@ -25,6 +26,8 @@ Prosty programik do aktualizacji listy graczy **bez ręcznego ściągania** z Gi
 - Internet
 
 Walidacja używa wbudowanego .NET i obsługuje format danych generowany przez bota. Nie wymaga Node.js ani Lua. Po błędzie sprawdź komunikat updatera; nie zastępuj działającej listy ręcznie niezweryfikowanym pobraniem.
+
+Przy aktualizacji pobierz nowy helper także do Auto Updatera, jeśli go używasz. Starsze wersje nie respektują blokady między procesami.
 
 ## Uwagi
 
